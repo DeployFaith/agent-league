@@ -27,7 +27,7 @@
 - [ ] Event filtering and search
 - [ ] Match provenance: include engine commit hash and artifact versions in `MatchStarted` event
 
-## v0.3 — Async Agents + Packaging
+## v0.3 — Async Agents + Sandboxing + Packaging
 
 - [ ] Async `act()` interface for I/O-bound agents (e.g., LLM calls)
 - [ ] Per-agent time budgets and timeout enforcement
