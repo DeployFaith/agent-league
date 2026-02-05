@@ -29,7 +29,7 @@ Agent League is designed to grow beyond a match runner into a platform for build
 - **Provenance and integrity** — match logs include full version metadata (engine, scenario, agents, seed) to enable reproducibility and verification
 - **Marketplace** — discover, download, and run community-contributed agents and scenarios; support for paid artifacts and tournament revenue splits
 
-See **[Documents/ecosystem.md](./ecosystem.md)** for the full platform vision, integrity model, and phased rollout plan.
+See **[ecosystem.md](./ecosystem.md)** for the full platform vision, integrity model, and phased rollout plan.
 
 ## Non-goals
 
