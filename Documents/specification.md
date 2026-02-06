@@ -138,26 +138,32 @@ Optional:
 
 The event log is a sequence of JSON objects.
 
-### 5.1 Required Event Fields (Draft)
+### 5.1 Required Event Fields
 
-* `event_idx` (monotonic)
-* `type` (string)
-* `turn` (integer, optional if event type is not turn-based)
-* `timestamp` (optional; avoid if determinism is required)
-* `payload` (object)
+Every event in `match.jsonl` must include:
 
-### 5.2 Common Event Types (Illustrative)
+* `type` (string, PascalCase)
+* `seq` (integer, monotonically increasing from 0)
+* `matchId` (string)
 
-* `match_started`
-* `turn_started`
-* `observation_emitted` (may include public + private fields)
-* `action_submitted`
-* `action_invalid`
-* `state_updated`
-* `score_updated`
-* `match_ended`
+Additional fields depend on event type; see §5.2.
 
-Scenarios may define additional event types.
+> **Note:** The original draft used `event_idx` and `payload` as field names. The implemented contract uses `seq` as the sequence counter and places type-specific data as top-level fields (not nested under `payload`). No `timestamp` field is emitted (determinism requirement).
+
+### 5.2 Event Types (Implemented)
+
+| Type | Additional Fields |
+|---|---|
+| `MatchStarted` | `seed`, `agentIds`, `scenarioName`, `maxTurns`, optional `engineCommit`, `engineVersion` |
+| `TurnStarted` | `turn` |
+| `ObservationEmitted` | `agentId`, `turn`, `observation` |
+| `ActionSubmitted` | `agentId`, `turn`, `action` |
+| `ActionAdjudicated` | `agentId`, `turn`, `valid`, `feedback` |
+| `StateUpdated` | `turn`, `summary` |
+| `AgentError` | `agentId`, `turn`, `message` |
+| `MatchEnded` | `reason` (`"completed"` or `"maxTurnsReached"`), `scores`, `turns`, optional `details` |
+
+Scenarios may define additional event types. The viewer treats unrecognized types as "unknown" and renders them with a raw JSON fallback.
 
 ### 5.3 Private vs Public Fields
 
@@ -276,4 +282,4 @@ The system must support:
 * on-chain settlement
 * real-time streaming infrastructure
 
-All of these are future layers on top of the offline c
+All of these are future layers on top of the offline core loop.
