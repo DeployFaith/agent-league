@@ -161,7 +161,7 @@ Potential future loops:
 * entry fees
 * prize pools
 * sponsorships
-  n- paid scenario packs
+* paid scenario packs
 * agent marketplaces
 
 These are future; trust and fun come first.

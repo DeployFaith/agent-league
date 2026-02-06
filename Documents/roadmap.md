@@ -194,8 +194,94 @@ Infrastructure must not be required to run a tournament.
 * local harness quickstart
 * reproducible builds
 
+## Current Status (Confirmed by Repo Audit)
+
+Last audited: 2026-02-06
+
+### Milestone 0 — Foundations: ✅ Done
+
+All spec documents are written and checked in under `Documents/`.
+
+### Milestone 1 — Deterministic Tournament Harness: ✅ Done
+
+| Deliverable | Status | Evidence |
+|---|---|---|
+| CLI harness (run matches) | ✅ | `src/cli/run-match.ts`, `src/cli/run-demo.ts` |
+| Round-robin tournament | ✅ | `src/tournament/runTournament.ts` |
+| Deterministic seed derivation | ✅ | `deriveMatchSeed()` via FNV-1a32, tested in `tests/jsonl-determinism.test.ts` |
+| `match.jsonl` per match | ✅ | `src/tournament/artifacts.ts` |
+| Standings table | ✅ | `standings.json` written by `writeTournamentArtifacts()` |
+| Tournament bundle (`--bundle-out`) | ✅ | `src/tournament/artifacts.ts` → `writeTournamentBundle()` |
+| Seeded PRNG (Mulberry32) | ✅ | `src/core/rng.ts` |
+| Stable JSON serialization | ✅ | `src/core/json.ts` |
+| NumberGuess scenario | ✅ | `src/scenarios/numberGuess/index.ts` |
+| Two agents (random, baseline) | ✅ | `src/agents/randomAgent.ts`, `src/agents/baselineAgent.ts` |
+| Secret reveal at match end | ✅ | `Scenario.reveal()` → `MatchEnded.details` |
+
+**Gaps vs spec:**
+
+* Output file is `tournament.json`, not `tournament_manifest.json` as described in this doc.
+* Per-match `match_manifest.json` is not produced (only `match_summary.json`).
+* Bracket/single-elimination formats are not implemented (round-robin only).
+* No `verify-tournament` CLI.
+* Scoring uses win=3 / draw=1 / loss=0 (this doc §8.1 says win=1 / loss=0).
+
+### Milestone 2 — Replay Viewer MVP: ✅ Done
+
+| Deliverable | Status | Evidence |
+|---|---|---|
+| JSONL parsing (Zod-validated + tolerant) | ✅ | `src/lib/replay/parser.ts`, `parseJsonl.ts` |
+| Terminal renderer (console + Markdown recap) | ✅ | `src/cli/replay-match.ts` |
+| Web replay viewer (interactive timeline) | ✅ | `src/app/replay/page.tsx` (~1900 lines) |
+| Moment extraction (turn-based) | ✅ | `src/lib/replay/detectMoments.ts` |
+| Commentary hooks (parser + viewer) | ✅ | `src/lib/replay/commentary.ts` |
+| Redaction / spoiler protection | ✅ | `src/lib/replay/redaction.ts` |
+| Three viewer modes (spectator/postMatch/director) | ✅ | Implemented in web viewer |
+| Event filtering (turn/agent/type) | ✅ | Implemented in web viewer |
+| Unknown event handling | ✅ | Orange "(unknown)" label, dashed border |
+| Tournament folder loading | ✅ | File System Access API + webkitdirectory fallback |
+| Sample replay loading | ✅ | Bundled fixture + `public/replays/` |
+| Deterministic event ordering by `seq` | ✅ | Stable sort in `parseJsonl.ts` |
+
+**Gaps vs spec:**
+
+* No auto-play/pause (step-by-step scrubbing only, no timed playback).
+* Moment detection is basic (turn boundaries only, no score-swing / error / reversal heuristics).
+* `moments.json` is not automatically produced as an artifact file by the harness.
+
+### Milestone 2.1 — Show Experiments: 🟨 Partial
+
+* Commentary parsing and rendering: ✅ implemented.
+* `highlights.json` generation: ⬜ not implemented.
+* Scene/storyboard prompts: ⬜ not implemented.
+
+### Milestone 3 — Artifact Bundles & Local Registry: 🟨 Partial
+
+* Tournament folder output with standard layout: ✅
+* Single-file tournament bundle: ✅ (`--bundle-out`)
+* `broadcast_manifest.json`: ⬜ not implemented.
+* Local registry index: ⬜ not implemented.
+* Bundle validation tooling: ⬜ not implemented (JSONL validation exists for individual files).
+
+### Milestone 4 — Receipts & Verification Tooling: ⬜ Not Started
+
+* No hash computation, signed receipts, or verification CLI.
+
+### Milestone 5 — Tournament Operations: ⬜ Not Started
+
+* No fight card metadata, intros/outros, or publish pipeline in the engine.
+* Shell scripts exist for manual publishing (`scripts/match-publish.sh`, `scripts/tournament-publish.sh`) but are not part of the engine.
+
+### Milestone 6 — Online Infrastructure: ⬜ Not Started
+
+### Cross-Cutting Workstreams
+
+* **Scenario Library:** Only NumberGuess. No hidden-information scenario yet.
+* **Safety & Policy:** Mode profiles are defined in docs but not enforced by the harness.
+* **Developer Experience:** No agent templates or quickstart guide.
+
 ## Status Notes
 
-* “No servers/DBs early” is a product constraint.
-* “Watchability” is an explicit milestone requirement.
+* "No servers/DBs early" is a product constraint.
+* "Watchability" is an explicit milestone requirement.
 * Integrity is layered: truth first, then telemetry, then show.
