@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Agent League is a TypeScript/Node.js project in early scaffold phase. The repository provides foundational tooling, CI/CD, and documentation structure. Source code uses ES modules with strict TypeScript.
+Agent League is a TypeScript/Node.js + Next.js project implementing a competitive agent tournament platform ("UFC for Agents"). It includes a deterministic match engine, round-robin tournament harness, CLI tooling, and a web-based replay viewer. Source code uses ES modules with strict TypeScript.
 
 ## Quick Reference
 
@@ -13,17 +13,34 @@ npm run format:check # Check Prettier formatting
 npm run format       # Auto-format all files with Prettier
 npm run typecheck    # Type-check with tsc --noEmit
 npm test             # Run tests with Vitest
+npm run dev          # Start Next.js dev server (web UI)
+npm run build        # Build Next.js app
+npm run demo         # Run a demo match and write JSONL output
+npm run match        # Run a single configurable match
+npm run tournament   # Run a round-robin tournament
+npm run replay       # Replay a match from a JSONL file
 ```
 
-All four checks (lint, format:check, typecheck, test) must pass before any commit or PR. CI runs them on every push and pull request.
+All four checks (lint, format:check, typecheck, test) must pass before any commit or PR.
 
 ## Repository Structure
 
 ```
-src/              TypeScript source code (ES modules)
-tests/            Test files using Vitest (*.test.ts)
-Documents/        Project documentation (overview, specification, roadmap)
-scripts/          Build/utility scripts (currently empty)
+src/
+  app/            Next.js pages (replay viewer, leaderboard, agents, matches, etc.)
+  cli/            CLI entry points (run-demo, run-match, run-tournament, replay-match)
+  components/     React components (app shell, event feed, timeline, UI primitives)
+  contract/       Type definitions and interfaces (Agent, Scenario, events)
+  core/           Core utilities (seeded RNG, stable JSON serialization)
+  engine/         Match execution engine (runMatch)
+  lib/            Replay library (parser, redaction, commentary, moments), models, store
+  agents/         Built-in agents (random, baseline)
+  scenarios/      Scenario implementations (numberGuess)
+  tournament/     Tournament orchestration (runTournament, artifacts, types)
+tests/            Test files using Vitest (*.test.ts) — 13 suites, 120 tests
+Documents/        Project documentation (12 spec/design documents)
+scripts/          Build/utility scripts (gen-sample-replay, validate-jsonl, shell scripts)
+public/           Static assets (sample replay files)
 .github/          CI workflow and issue/PR templates
 ```
 
@@ -44,10 +61,9 @@ scripts/          Build/utility scripts (currently empty)
 
 ## TypeScript Configuration
 
-- `strict: true` — all strict checks active
-- `noEmit: true` — type checking only, no JS output
-- `target: ES2022`, `module: NodeNext`, `moduleResolution: NodeNext`
-- Includes: `src/` and `tests/`
+- **`tsconfig.json`** (main): strict mode, `target: ES2022`, JSX react-jsx, path alias `@/*` → `./src/*`. Includes `src/` and `tests/`.
+- **`tsconfig.build.json`** (engine/CLI): `module: NodeNext`, outputs to `dist/`. Includes engine, CLI, contract, core, scenarios, tournament code. Excludes web app code.
+- **`tsconfig.scripts.json`** (build scripts): outputs to `dist-scripts/`.
 
 ## Testing
 
@@ -58,20 +74,20 @@ scripts/          Build/utility scripts (currently empty)
 
 ## Linting & Formatting
 
-- **ESLint 9** with flat config (`eslint.config.js`) — scoped to `src/**/*.ts` and `tests/**/*.ts`
+- **ESLint 9** with flat config (`eslint.config.js`) — scoped to `src/**/*.{ts,tsx}` and `tests/**/*.{ts,tsx}`
 - **Prettier 3** — config in `.prettierrc.json`, ignore rules in `.prettierignore`
 - **EditorConfig** — `.editorconfig` ensures consistent editor settings
 
 ## CI Pipeline
 
-GitHub Actions (`.github/workflows/ci.yml`) runs on every push and pull request:
+GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `main` and on pull requests:
 
 1. Checkout → Setup Node LTS → `npm ci`
 2. `npm run lint`
 3. `npm run typecheck`
 4. `npm test`
 
-All steps must pass for the pipeline to succeed.
+All steps must pass for the pipeline to succeed. Run `npm run format:check` locally before committing (not yet in CI).
 
 ## Branching & PRs
 
@@ -82,23 +98,30 @@ All steps must pass for the pipeline to succeed.
 
 ## Dependencies
 
-- **Runtime:** None currently
+- **Runtime:** React 19, Next.js 16, Radix UI, Tailwind CSS 4, Zustand, Zod 4, Lucide icons
 - **Dev:** TypeScript 5.x, ESLint 9.x, Prettier 3.x, Vitest 2.x, @types/node 22.x
 - **Node version:** LTS (specified in `.nvmrc`)
 - **Override:** esbuild pinned to `^0.25.0` (security advisory)
 
 ## Key Files
 
-| File                       | Purpose                                                     |
-| -------------------------- | ----------------------------------------------------------- |
-| `src/index.ts`             | Main entry point                                            |
-| `tests/smoke.test.ts`      | Smoke test verifying test setup                             |
-| `eslint.config.js`         | ESLint flat config with project rules                       |
-| `tsconfig.json`            | TypeScript compiler options                                 |
-| `.prettierrc.json`         | Prettier formatting rules                                   |
-| `.github/workflows/ci.yml` | CI pipeline definition                                      |
-| `CONTRIBUTING.md`          | Contribution guidelines                                     |
-| `SECURITY.md`              | Security vulnerability reporting (security@deployfaith.xyz) |
+| File                              | Purpose                                                     |
+| --------------------------------- | ----------------------------------------------------------- |
+| `src/index.ts`                    | Main entry point (re-exports)                               |
+| `src/engine/runMatch.ts`          | Core match execution engine                                 |
+| `src/tournament/runTournament.ts` | Round-robin tournament orchestration                        |
+| `src/contract/types.ts`           | Event types and domain types                                |
+| `src/contract/interfaces.ts`      | Agent, Scenario, and runner config interfaces               |
+| `src/app/replay/page.tsx`         | Web replay viewer                                           |
+| `src/lib/replay/`                 | Replay library (parser, redaction, commentary, moments)     |
+| `tests/smoke.test.ts`             | Smoke test verifying test setup                             |
+| `eslint.config.js`                | ESLint flat config with project rules                       |
+| `tsconfig.json`                   | TypeScript compiler options (Next.js + tests)               |
+| `tsconfig.build.json`             | TypeScript build config for engine/CLI                      |
+| `.prettierrc.json`                | Prettier formatting rules                                   |
+| `.github/workflows/ci.yml`        | CI pipeline definition                                      |
+| `CONTRIBUTING.md`                 | Contribution guidelines                                     |
+| `SECURITY.md`                     | Security vulnerability reporting (security@deployfaith.xyz) |
 
 ## Secrets Policy
 
