@@ -252,3 +252,15 @@ Dispute outcomes should be logged (who decided what, and why), ideally as signed
 
 * public verification service
 * optional anchoring / escrow integration (only after trust is solid)
+
+## 12. Implementation Status (Repo Audit)
+
+Last audited: 2026-02-06
+
+**Phase A status:**
+
+* Deterministic tournament harness outputs: ✅ implemented (`src/tournament/`).
+* Match manifest with version stamping: 🟨 partial — `match_summary.json` is written per match but a full `match_manifest.json` with runner/scenario content hashes is not produced. Optional provenance fields (`engineCommit`, `engineVersion`) are supported via CLI flags.
+* Log hashing: ⬜ not implemented.
+
+**Phase B and C:** Not started. No receipts, signatures, verification CLI, or content hashing.
