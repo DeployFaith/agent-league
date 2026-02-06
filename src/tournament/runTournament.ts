@@ -1,5 +1,5 @@
 import type { Agent, Scenario } from "../contract/interfaces.js";
-import type { AgentId } from "../contract/types.js";
+import type { AgentId, MatchEvent } from "../contract/types.js";
 import { createRng, deriveSeed } from "../core/rng.js";
 import { runMatch } from "../engine/runMatch.js";
 import { createNumberGuessScenario } from "../scenarios/numberGuess/index.js";
@@ -61,7 +61,7 @@ const POINTS_LOSS = 0;
  * Deterministic: given the same config, produces identical results.
  */
 export function runTournament(config: TournamentConfig): TournamentResult {
-  const { seed, maxTurns, rounds, scenarioKey, agentKeys } = config;
+  const { seed, maxTurns, rounds, scenarioKey, agentKeys, includeEventLogs } = config;
 
   // Validate
   const scenarioFactory = getScenarioFactory(scenarioKey);
@@ -72,6 +72,7 @@ export function runTournament(config: TournamentConfig): TournamentResult {
 
   const rng = createRng(seed);
   const matches: MatchSummary[] = [];
+  const matchLogs: Record<string, MatchEvent[]> = {};
 
   // Round-robin: for every unordered pair (i, j) with i < j, play `rounds` matches
   for (let round = 0; round < rounds; round++) {
@@ -89,10 +90,9 @@ export function runTournament(config: TournamentConfig): TournamentResult {
         const agentB = agentFactories[j].factory(agentBId);
 
         // Deterministic seat-order swap to avoid first-move bias:
-        //   - Multi-round: alternate by round parity
-        //   - Single-round: derive from match seed parity
-        const swapOrder = round % 2 === 1 || (rounds === 1 && Math.abs(matchSeed) % 2 === 1);
-        const orderedAgents = swapOrder ? [agentB, agentA] : [agentA, agentB];
+        // incorporates round and pair indices so order alternates across rounds
+        const swap = (round + i + j) % 2 === 1;
+        const orderedAgents = swap ? [agentB, agentA] : [agentA, agentB];
         const seats: [AgentId, AgentId] = [orderedAgents[0].id, orderedAgents[1].id];
 
         const result = runMatch(scenario, orderedAgents, {
@@ -100,8 +100,11 @@ export function runTournament(config: TournamentConfig): TournamentResult {
           maxTurns,
         });
 
-        // Determine winner
-        const ids = [agentAId, agentBId];
+        if (includeEventLogs) {
+          matchLogs[result.matchId] = result.events;
+        }
+
+        // Determine winner (uses stable IDs, independent of seat order)
         const scoreA = result.scores[agentAId] ?? 0;
         const scoreB = result.scores[agentBId] ?? 0;
         let winner: AgentId | null = null;
@@ -114,10 +117,11 @@ export function runTournament(config: TournamentConfig): TournamentResult {
         const lastEvent = result.events[result.events.length - 1];
         const reason = lastEvent.type === "MatchEnded" ? lastEvent.reason : "unknown";
 
+        // agentIds reflects actual order passed to runMatch
         matches.push({
           matchId: result.matchId,
           seed: matchSeed,
-          agentIds: ids,
+          agentIds: [orderedAgents[0].id, orderedAgents[1].id],
           seats,
           scores: result.scores,
           winner,
@@ -133,7 +137,11 @@ export function runTournament(config: TournamentConfig): TournamentResult {
     matches,
   );
 
-  return { config, matches, standings };
+  const tournamentResult: TournamentResult = { config, matches, standings };
+  if (includeEventLogs) {
+    tournamentResult.matchLogs = matchLogs;
+  }
+  return tournamentResult;
 }
 
 // ---------------------------------------------------------------------------

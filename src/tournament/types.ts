@@ -1,4 +1,4 @@
-import type { AgentId, MatchId, Seed } from "../contract/types.js";
+import type { AgentId, MatchEvent, MatchId, Seed } from "../contract/types.js";
 
 /** Configuration for a round-robin tournament. */
 export interface TournamentConfig {
@@ -7,6 +7,8 @@ export interface TournamentConfig {
   rounds: number;
   scenarioKey: string;
   agentKeys: string[];
+  /** If true, include full per-match event logs in the result. */
+  includeEventLogs?: boolean;
 }
 
 /** Summary of a single match within a tournament. */
@@ -41,4 +43,6 @@ export interface TournamentResult {
   config: TournamentConfig;
   matches: MatchSummary[];
   standings: StandingsRow[];
+  /** Per-match event logs, keyed by matchId. Only present when config.includeEventLogs is true. */
+  matchLogs?: Record<MatchId, MatchEvent[]>;
 }

@@ -105,6 +105,7 @@ function main(): void {
     rounds: args.rounds,
     scenarioKey: args.scenario,
     agentKeys: args.agents,
+    ...(args.writeLogs && { includeEventLogs: true }),
   };
 
   // eslint-disable-next-line no-console
@@ -126,22 +127,25 @@ function main(): void {
   if (args.outDir) {
     mkdirSync(args.outDir, { recursive: true });
     const summaryPath = join(args.outDir, "tournament.json");
-    writeFileSync(summaryPath, JSON.stringify(result, null, 2) + "\n", "utf-8");
+    // Write summary without event logs (those go into per-match JSONL files)
+    const summary = { config: result.config, matches: result.matches, standings: result.standings };
+    writeFileSync(summaryPath, JSON.stringify(summary, null, 2) + "\n", "utf-8");
     // eslint-disable-next-line no-console
     console.log(`\nWrote tournament summary to ${summaryPath}`);
 
-    if (args.writeLogs) {
+    if (args.writeLogs && result.matchLogs) {
       const matchesDir = join(args.outDir, "matches");
       mkdirSync(matchesDir, { recursive: true });
-      // eslint-disable-next-line no-console
-      console.log(`Match logs directory: ${matchesDir}`);
-      // Note: v0.1 writes match summaries as JSONL (one line per match).
-      // Full event logs would require runMatch to be called with event capture,
-      // which is deferred to v0.2.
       for (const m of result.matches) {
-        const logPath = join(matchesDir, `${m.matchId}.jsonl`);
-        writeFileSync(logPath, JSON.stringify(m) + "\n", "utf-8");
+        const events = result.matchLogs[m.matchId];
+        if (events) {
+          const logPath = join(matchesDir, `${m.matchId}.jsonl`);
+          const lines = events.map((e) => JSON.stringify(e)).join("\n") + "\n";
+          writeFileSync(logPath, lines, "utf-8");
+        }
       }
+      // eslint-disable-next-line no-console
+      console.log(`Wrote ${result.matches.length} match logs to ${join(args.outDir, "matches")}`);
     }
   }
 }

@@ -156,15 +156,50 @@ describe("Tournament Harness v0.1", () => {
       }
     });
 
-    it("rounds=1: seat ordering can differ between seeds based on matchSeed parity", () => {
-      // Collect seat orders across several seeds; at least one should differ
-      const seatOrders = new Set<string>();
-      for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
-        const result = runTournament(makeConfig({ seed, rounds: 1 }));
-        seatOrders.add(JSON.stringify(result.matches[0].seats));
+    it("order alternates across rounds", () => {
+      const result = runTournament(makeConfig({ seed: 42, rounds: 2 }));
+      expect(result.matches).toHaveLength(2);
+
+      const order0 = result.matches[0].agentIds;
+      const order1 = result.matches[1].agentIds;
+
+      // The two matches should have opposite agent ordering
+      expect(order0).not.toEqual(order1);
+      expect(order0).toEqual([...order1].reverse());
+    });
+
+    it("agentIds reflects actual runMatch order (matches seats)", () => {
+      const result = runTournament(makeConfig({ seed: 42, rounds: 2 }));
+      for (const m of result.matches) {
+        expect(m.agentIds).toEqual([...m.seats]);
       }
-      // With matchSeed parity swapping, we expect both orderings to appear
-      expect(seatOrders.size).toBeGreaterThan(1);
+    });
+  });
+
+  describe("event logs", () => {
+    it("event logs present when includeEventLogs is true", () => {
+      const result = runTournament(makeConfig({ seed: 42, rounds: 2, includeEventLogs: true }));
+
+      expect(result.matchLogs).toBeDefined();
+      for (const m of result.matches) {
+        const events = result.matchLogs![m.matchId];
+        expect(events).toBeDefined();
+        expect(events.length).toBeGreaterThan(0);
+        expect(events[0].type).toBe("MatchStarted");
+        expect(events[events.length - 1].type).toBe("MatchEnded");
+      }
+    });
+
+    it("event logs absent when includeEventLogs is not set", () => {
+      const result = runTournament(makeConfig({ seed: 42 }));
+      expect(result.matchLogs).toBeUndefined();
+    });
+
+    it("event logs are deterministic", () => {
+      const config = makeConfig({ seed: 123, rounds: 2, includeEventLogs: true });
+      const r1 = runTournament(config);
+      const r2 = runTournament(config);
+      expect(JSON.stringify(r1.matchLogs)).toBe(JSON.stringify(r2.matchLogs));
     });
   });
 });
