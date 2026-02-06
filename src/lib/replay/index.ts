@@ -14,3 +14,5 @@ export {
 export type { CanonicalEvent, CanonicalUnknownEvent, EventSortKey } from "./event";
 export { validateJsonlText } from "./validateJsonl";
 export type { JsonlValidationError, JsonlValidationResult } from "./validateJsonl";
+export { redactEvent, redactEvents } from "./redaction";
+export type { ViewerMode, RedactionOptions, RedactedEvent } from "./redaction";
