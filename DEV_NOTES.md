@@ -98,6 +98,26 @@ Dark/light theme implemented via CSS custom properties in `globals.css` using Ta
 | `npm test` | Run Vitest tests |
 | `npm run build:engine` | Build engine code (tsc, outputs to dist/) |
 
+## Match outputs (local)
+
+Run a local match and note the printed output paths:
+
+```
+scripts/match-local.sh --scenario numberGuess --seed 42 --turns 20 --agentA random --agentB baseline
+```
+
+Find the latest JSONL output quickly:
+
+```
+scripts/latest-match-jsonl.sh
+```
+
+Verify that actions exist in the JSONL:
+
+```
+rg '"ActionSubmitted"' "$(scripts/latest-match-jsonl.sh)"
+```
+
 ## Replay Viewer
 
 The replay viewer loads engine JSONL event logs and renders them as spectator-friendly timelines.

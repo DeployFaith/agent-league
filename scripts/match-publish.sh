@@ -91,3 +91,9 @@ echo "Wrote: $out_jsonl"
 echo "Wrote: $out_md"
 echo "URL: https://hashmatch.deployfaith.xyz/matches/latest.jsonl"
 echo "URL: https://hashmatch.deployfaith.xyz/matches/latest.md"
+echo "OUTPUT_JSONL=$out_jsonl"
+echo "OUTPUT_MD=$out_md"
+echo "OUTPUT_DIR=$matches_dir"
+if [[ -f "$matches_dir/gateway_transcript.jsonl" ]]; then
+  echo "OUTPUT_GATEWAY_TRANSCRIPT=$matches_dir/gateway_transcript.jsonl"
+fi
