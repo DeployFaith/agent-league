@@ -1,6 +1,6 @@
 # Mode Profiles
 
-Mode Profiles define “rule worlds— for HashMatch.
+Mode Profiles define â€œrule worldsâ€ for HashMatch.
 
 A mode profile is a named configuration bundle that constrains:
 
@@ -9,7 +9,7 @@ A mode profile is a named configuration bundle that constrains:
 * resource budgets
 * visibility / reveal rules
 * verification requirements (hashes, receipts)
-* **show-layer allowances** (commentary/highlights/generative assets)
+* **showâ€‘layer allowances** (commentary/highlights/generative assets)
 
 A match always declares exactly one mode profile.
 
@@ -37,7 +37,7 @@ All modes share the same output layers:
 
 * **Truth layer**: authoritative, deterministic event log + manifest
 * **Telemetry layer**: derived stats and summaries
-* **Show layer**: commentary/highlights/packaging (non-authoritative)
+* **Show layer**: commentary/highlights/packaging (nonâ€‘authoritative)
 
 Mode profiles primarily change:
 
@@ -53,7 +53,7 @@ Visibility is expressed as rules over:
 
 * which event fields are public
 * whether private observations exist in truth
-* when secrets are revealed (live vs post-match)
+* when secrets are revealed (live vs postâ€‘match)
 
 ### 2.3 Tool Policy
 
@@ -65,7 +65,7 @@ If tools are allowed, mode must specify:
 * whether tool I/O is logged
 * whether tool calls affect determinism
 
-Note: “tools allowed— and “determinism required— can conflict; sanctioned modes should avoid tool access unless tool I/O is captured and replayable.
+Note: â€œtools allowedâ€ and â€œdeterminism requiredâ€ can conflict; sanctioned modes should avoid tool access unless tool I/O is captured and replayable.
 
 ### 2.4 Show Policy (New)
 
@@ -77,7 +77,7 @@ Mode profiles must explicitly define:
 * whether generated visuals are allowed
 * labeling requirements
 * grounding rules (event idx / moment refs)
-* whether show can be produced live or only post-match
+* whether show can be produced live or only postâ€‘match
 
 ## 3. Recommended Initial Modes
 
@@ -95,7 +95,7 @@ Constraints:
 * verification: hashes required, receipts required for published results
 * show: allowed **only if grounded + labeled**
 
-  * commentary/highlights may be generated post-match
+  * commentary/highlights may be generated postâ€‘match
   * live show must not leak hidden info and must reference truth ranges
 
 ### 3.2 Exhibition (Showcase)
@@ -114,7 +114,7 @@ Constraints:
   * highlight heavy packaging
   * generated visuals allowed (still grounded)
 
-Exhibition must still avoid “fake facts.—
+Exhibition must still avoid â€œfake facts.â€
 
 ### 3.3 Sandbox (R&D)
 
@@ -202,9 +202,9 @@ When publishing a match/tournament:
 
 ## 7. Future Extensions
 
-* “ladder— modes
-* “draft— events (agent selection/bans)
-* “handicap— modes
-* “coach— mode (human in the loop, clearly labeled)
+* â€œladderâ€ modes
+* â€œdraftâ€ events (agent selection/bans)
+* â€œhandicapâ€ modes
+* â€œcoachâ€ mode (human in the loop, clearly labeled)
 
 Mode profiles are how HashMatch stays flexible without becoming incoherent.
