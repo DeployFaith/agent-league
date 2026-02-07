@@ -71,6 +71,66 @@ function cloneRaw(raw: Record<string, unknown>): Record<string, unknown> {
 }
 
 /**
+ * Recursively strip all `_private` keys from a value.
+ *
+ * Convention: any object may include a `_private` key whose value holds fields
+ * that must be hidden in spectator mode.  This helper removes every `_private`
+ * key at any depth in the object tree (including inside arrays) and returns a
+ * new deep-cloned structure.
+ *
+ * Returns `true` if at least one `_private` key was found and removed.
+ */
+function stripPrivateFields(value: unknown): { result: unknown; stripped: boolean } {
+  if (Array.isArray(value)) {
+    let anyStripped = false;
+    const arr = value.map((item) => {
+      const { result, stripped } = stripPrivateFields(item);
+      if (stripped) {
+        anyStripped = true;
+      }
+      return result;
+    });
+    return { result: arr, stripped: anyStripped };
+  }
+
+  if (typeof value === "object" && value !== null) {
+    const obj = value as Record<string, unknown>;
+    let anyStripped = "_private" in obj;
+    const out: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(obj)) {
+      if (key === "_private") {
+        continue;
+      }
+      const { result, stripped } = stripPrivateFields(val);
+      if (stripped) {
+        anyStripped = true;
+      }
+      out[key] = result;
+    }
+    return { result: out, stripped: anyStripped };
+  }
+
+  return { result: value, stripped: false };
+}
+
+/**
+ * Check whether a value contains any `_private` key at any depth.
+ */
+function hasPrivateFields(value: unknown): boolean {
+  if (Array.isArray(value)) {
+    return value.some(hasPrivateFields);
+  }
+  if (typeof value === "object" && value !== null) {
+    const obj = value as Record<string, unknown>;
+    if ("_private" in obj) {
+      return true;
+    }
+    return Object.values(obj).some(hasPrivateFields);
+  }
+  return false;
+}
+
+/**
  * Determine whether an event's payload should be redacted given the current
  * viewer settings.
  */
@@ -103,6 +163,16 @@ function shouldRedact(event: ReplayEvent, opts: RedactionOptions): boolean {
 // ---------------------------------------------------------------------------
 
 function redactObservation(raw: Record<string, unknown>): Record<string, unknown> {
+  // Field-level redaction: if the observation payload contains `_private` keys,
+  // strip only those fields and keep the rest visible (mixed public/private).
+  if (hasPrivateFields(raw.observation)) {
+    const redacted = cloneRaw(raw);
+    const { result } = stripPrivateFields(redacted.observation);
+    redacted.observation = result;
+    return redacted;
+  }
+
+  // Backward compat: no _private key → fully redact the entire observation.
   const redacted = cloneRaw(raw);
   redacted.observation = REDACTED_PLACEHOLDER;
   return redacted;
@@ -143,6 +213,9 @@ function buildSummary(event: ReplayEvent, redacted: boolean): string {
     case "TurnStarted":
       return `Turn ${event.turn} started`;
     case "ObservationEmitted":
+      if (redacted && hasPrivateFields(raw.observation)) {
+        return `Observation → ${event.agentId} [partially redacted]`;
+      }
       return redacted
         ? `Observation → ${event.agentId} [redacted]`
         : `Observation → ${event.agentId}`;
@@ -188,6 +261,12 @@ export function redactEvent(event: ReplayEvent, opts?: Partial<RedactionOptions>
     fullRaw: options.revealSpoilers || options.mode === "director" ? cloneRaw(event.raw) : null,
   };
 }
+
+/**
+ * Strip `_private` keys from a value tree.  Exported for use in moment
+ * detection and other modules that need spectator-safe data.
+ */
+export { stripPrivateFields };
 
 /** Redact a batch of events. */
 export function redactEvents(

@@ -20,6 +20,9 @@ import {
   ShieldAlert,
   Filter,
   MessageSquare,
+  Play,
+  Pause,
+  Gauge,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -139,6 +142,64 @@ interface EventFilters {
 }
 
 const EMPTY_FILTERS: EventFilters = { turn: null, agentId: null, type: null };
+
+/** Autoplay speed presets — label and interval in ms. */
+const AUTOPLAY_SPEEDS = [
+  { label: "0.5x", ms: 2000 },
+  { label: "1x", ms: 1000 },
+  { label: "2x", ms: 500 },
+  { label: "4x", ms: 250 },
+  { label: "10x", ms: 100 },
+] as const;
+
+type AutoplaySpeedIdx = 0 | 1 | 2 | 3 | 4;
+
+/** Styling for the 6 moment types. */
+const momentTypeStyles: Record<string, { badge: string; bg: string }> = {
+  score_swing: {
+    badge: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+    bg: "border-amber-500/20",
+  },
+  lead_change: {
+    badge: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+    bg: "border-blue-500/20",
+  },
+  comeback: {
+    badge: "bg-green-500/20 text-green-400 border-green-500/30",
+    bg: "border-green-500/20",
+  },
+  blunder: { badge: "bg-red-500/20 text-red-400 border-red-500/30", bg: "border-red-500/20" },
+  clutch: {
+    badge: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+    bg: "border-purple-500/20",
+  },
+  close_call: {
+    badge: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
+    bg: "border-cyan-500/20",
+  },
+};
+
+/** Return a safe description for a moment in spectator mode (no private leaks). */
+function safeMomentDescription(moment: ReplayMoment, spoilers: boolean): string {
+  if (spoilers && moment.description) {
+    return moment.description;
+  }
+  // In spectator mode, show type + involved agents if available, but not scores or private data.
+  const agentId =
+    typeof moment.signals.agentId === "string"
+      ? moment.signals.agentId
+      : typeof moment.signals.winner === "string"
+        ? moment.signals.winner
+        : typeof moment.signals.newLeader === "string"
+          ? moment.signals.newLeader
+          : null;
+  const turnInfo =
+    typeof moment.signals.decisiveTurn === "number"
+      ? ` at turn ${moment.signals.decisiveTurn}`
+      : "";
+  const suffix = agentId ? ` — ${agentId}${turnInfo}` : turnInfo;
+  return `${moment.label}${suffix}`;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -323,9 +384,10 @@ function parseMomentsJson(raw: unknown): ReplayMoment[] {
     ) {
       continue;
     }
-    const signals = record.signals && typeof record.signals === "object" && !Array.isArray(record.signals)
-      ? (record.signals as Record<string, unknown>)
-      : {};
+    const signals =
+      record.signals && typeof record.signals === "object" && !Array.isArray(record.signals)
+        ? (record.signals as Record<string, unknown>)
+        : {};
     const description = typeof record.description === "string" ? record.description : undefined;
     moments.push({
       id: record.id,
@@ -373,7 +435,12 @@ async function loadMatchFromSource(
   let moments: ReplayMoment[] | null = null;
 
   try {
-    const momentsRaw = await readJsonFromSource<unknown>(source, "matches", matchKey, "moments.json");
+    const momentsRaw = await readJsonFromSource<unknown>(
+      source,
+      "matches",
+      matchKey,
+      "moments.json",
+    );
     moments = parseMomentsJson(momentsRaw);
   } catch {
     moments = null;
@@ -506,11 +573,8 @@ function FileDropZone({
 
   const [directoryPickerAvailable, setDirectoryPickerAvailable] = useState(false);
 
-
   useEffect(() => {
-
     setDirectoryPickerAvailable(hasDirectoryPicker());
-
   }, []);
   // Set non-standard webkitdirectory / directory attributes imperatively
   // to avoid TypeScript errors with unknown JSX props.
@@ -645,18 +709,10 @@ function FileDropZone({
   );
 }
 
-function Scoreboard({
-  events,
-  spoilers,
-}: {
-  events: ReplayEvent[];
-  spoilers: boolean;
-}) {
+function Scoreboard({ events, spoilers }: { events: ReplayEvent[]; spoilers: boolean }) {
   const matchEnded = events.find((e) => e.type === "MatchEnded");
   const matchStarted = events.find((e) => e.type === "MatchStarted");
-  const agentIds: string[] = matchStarted
-    ? ((matchStarted.raw.agentIds as string[]) ?? [])
-    : [];
+  const agentIds: string[] = matchStarted ? ((matchStarted.raw.agentIds as string[]) ?? []) : [];
 
   return (
     <Card>
@@ -685,14 +741,12 @@ function Scoreboard({
           </div>
         ) : (
           <div className="space-y-2">
-            {Object.entries(matchEnded.raw.scores as Record<string, number>).map(
-              ([id, score]) => (
-                <div key={id} className="flex items-center justify-between text-sm">
-                  <span className="font-medium">{id}</span>
-                  <Badge variant={score > 0 ? "success" : "secondary"}>{score}</Badge>
-                </div>
-              ),
-            )}
+            {Object.entries(matchEnded.raw.scores as Record<string, number>).map(([id, score]) => (
+              <div key={id} className="flex items-center justify-between text-sm">
+                <span className="font-medium">{id}</span>
+                <Badge variant={score > 0 ? "success" : "secondary"}>{score}</Badge>
+              </div>
+            ))}
             {typeof matchEnded.raw.reason === "string" && (
               <p className="text-xs text-muted-foreground">Reason: {matchEnded.raw.reason}</p>
             )}
@@ -723,19 +777,14 @@ function EventCard({
       onClick={onClick}
       className={cn(
         "w-full text-left rounded-md border px-3 py-2 text-xs transition-colors",
-        isSelected
-          ? "border-primary bg-primary/10"
-          : "border-border hover:bg-muted/50",
+        isSelected ? "border-primary bg-primary/10" : "border-border hover:bg-muted/50",
         unknown && "border-dashed",
       )}
     >
       <div className="flex items-center gap-2">
         <span className="font-mono text-muted-foreground">{event.seq}</span>
         <span
-          className={cn(
-            "font-medium",
-            unknown ? "text-orange-400 italic" : typeColors[event.type],
-          )}
+          className={cn("font-medium", unknown ? "text-orange-400 italic" : typeColors[event.type])}
         >
           {event.type}
           {unknown && " (unknown)"}
@@ -745,9 +794,7 @@ function EventCard({
             {event.agentId}
           </Badge>
         )}
-        {event.isRedacted && (
-          <ShieldAlert className="h-3 w-3 text-muted-foreground" />
-        )}
+        {event.isRedacted && <ShieldAlert className="h-3 w-3 text-muted-foreground" />}
       </div>
       <p className="mt-0.5 text-muted-foreground truncate">{event.summary}</p>
     </button>
@@ -853,8 +900,7 @@ function ReplayFilterBar({
     return Array.from(turns).sort((a, b) => a - b);
   }, [events]);
 
-  const hasFilters =
-    filters.turn !== null || filters.agentId !== null || filters.type !== null;
+  const hasFilters = filters.turn !== null || filters.agentId !== null || filters.type !== null;
 
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -1082,11 +1128,7 @@ function TournamentBrowser({
                       <td className="py-1.5 pr-4 text-right">{row.losses}</td>
                       <td className="py-1.5 text-right">
                         <span
-                          className={
-                            row.scoreDiff > 0
-                              ? "text-green-400"
-                              : "text-muted-foreground"
-                          }
+                          className={row.scoreDiff > 0 ? "text-green-400" : "text-muted-foreground"}
                         >
                           {row.scoreDiff > 0 ? "+" : ""}
                           {row.scoreDiff}
@@ -1135,9 +1177,7 @@ function TournamentBrowser({
 
                   return (
                     <tr key={spec.matchKey} className="border-b border-border/50">
-                      <td className="py-2 pr-4 font-mono text-muted-foreground">
-                        {spec.matchKey}
-                      </td>
+                      <td className="py-2 pr-4 font-mono text-muted-foreground">{spec.matchKey}</td>
                       <td className="py-2 pr-4">{spec.agentIds.join(" vs ")}</td>
                       <td className="py-2 pr-4">{spec.scenarioName}</td>
                       <td className="py-2 pr-4 text-right">{turns}</td>
@@ -1205,7 +1245,10 @@ const severityStyles: Record<CommentarySeverity, string> = {
   info: "border-border bg-muted/20",
 };
 
-const severityBadgeVariant: Record<CommentarySeverity, "warning" | "info" | "secondary" | "default"> = {
+const severityBadgeVariant: Record<
+  CommentarySeverity,
+  "warning" | "info" | "secondary" | "default"
+> = {
   hype: "warning",
   analysis: "info",
   ref: "secondary",
@@ -1218,12 +1261,7 @@ const severityBadgeVariant: Record<CommentarySeverity, "warning" | "info" | "sec
 
 function CommentaryCard({ entry }: { entry: CommentaryEntry }) {
   return (
-    <div
-      className={cn(
-        "rounded-md border px-3 py-2 text-xs",
-        severityStyles[entry.severity],
-      )}
-    >
+    <div className={cn("rounded-md border px-3 py-2 text-xs", severityStyles[entry.severity])}>
       <div className="flex items-center gap-1.5 mb-1">
         <MessageSquare className="h-3 w-3 text-muted-foreground shrink-0" />
         {entry.speaker && (
@@ -1238,10 +1276,7 @@ function CommentaryCard({ entry }: { entry: CommentaryEntry }) {
       {entry.tags.length > 0 && (
         <div className="flex gap-1 mt-1.5 flex-wrap">
           {entry.tags.map((tag) => (
-            <span
-              key={tag}
-              className="rounded bg-muted px-1 py-0 text-[9px] text-muted-foreground"
-            >
+            <span key={tag} className="rounded bg-muted px-1 py-0 text-[9px] text-muted-foreground">
               #{tag}
             </span>
           ))}
@@ -1374,14 +1409,16 @@ function ReplayViewer({
   const [viewerMode, setViewerMode] = useState<ViewerMode>("spectator");
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [filters, setFilters] = useState<EventFilters>(EMPTY_FILTERS);
+
+  // Autoplay state
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [speedIdx, setSpeedIdx] = useState<AutoplaySpeedIdx>(1); // default 1x
+
   const moments = useMemo(
-    () => (momentsOverride ?? detectMoments(events)),
+    () => momentsOverride ?? detectMoments(events),
     [events, momentsOverride],
   );
-  const momentRanges = useMemo(
-    () => buildMomentEventRangeMap(moments, events),
-    [moments, events],
-  );
+  const momentRanges = useMemo(() => buildMomentEventRangeMap(moments, events), [moments, events]);
 
   // Commentary state
   const [commentaryEntries, setCommentaryEntries] = useState<CommentaryEntry[]>([]);
@@ -1423,10 +1460,7 @@ function ReplayViewer({
 
   // Compute redacted events based on current mode/spoiler settings
   const redactedEvents = useMemo(
-    () =>
-      events.map((ev) =>
-        redactEvent(ev, { mode: viewerMode, revealSpoilers: spoilers }),
-      ),
+    () => events.map((ev) => redactEvent(ev, { mode: viewerMode, revealSpoilers: spoilers })),
     [events, viewerMode, spoilers],
   );
 
@@ -1483,8 +1517,7 @@ function ReplayViewer({
   }, [filteredRedacted.length, selectedIdx]);
 
   const prevEvent = () => setSelectedIdx((i) => Math.max(0, i - 1));
-  const nextEvent = () =>
-    setSelectedIdx((i) => Math.min(filteredRedacted.length - 1, i + 1));
+  const nextEvent = () => setSelectedIdx((i) => Math.min(filteredRedacted.length - 1, i + 1));
   const firstEvent = () => setSelectedIdx(0);
   const lastEvent = () => setSelectedIdx(filteredRedacted.length - 1);
   const activeMoment = useMemo(() => {
@@ -1493,15 +1526,13 @@ function ReplayViewer({
       return null;
     }
     return (
-      moments.find(
-        (moment) => {
-          const range = momentRanges.get(moment.id);
-          if (!range) {
-            return false;
-          }
-          return activeIdx >= range.startEventIdx && activeIdx <= range.endEventIdx;
-        },
-      ) ?? null
+      moments.find((moment) => {
+        const range = momentRanges.get(moment.id);
+        if (!range) {
+          return false;
+        }
+        return activeIdx >= range.startEventIdx && activeIdx <= range.endEventIdx;
+      }) ?? null
     );
   }, [moments, momentRanges, selectedEvent?.originalIdx]);
 
@@ -1520,6 +1551,65 @@ function ReplayViewer({
     },
     [filteredRedacted, momentRanges],
   );
+
+  // Autoplay effect: advance playhead at the configured speed
+  useEffect(() => {
+    if (!isPlaying) {
+      return;
+    }
+    const interval = setInterval(() => {
+      setSelectedIdx((prev) => {
+        if (prev >= filteredRedacted.length - 1) {
+          setIsPlaying(false);
+          return prev;
+        }
+        return prev + 1;
+      });
+    }, AUTOPLAY_SPEEDS[speedIdx].ms);
+    return () => clearInterval(interval);
+  }, [isPlaying, speedIdx, filteredRedacted.length]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      // Skip if user is typing in an input/select
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") {
+        return;
+      }
+
+      switch (e.code) {
+        case "Space":
+          e.preventDefault();
+          setIsPlaying((p) => !p);
+          break;
+        case "ArrowLeft":
+          e.preventDefault();
+          setIsPlaying(false);
+          setSelectedIdx((i) => Math.max(0, i - 1));
+          break;
+        case "ArrowRight":
+          e.preventDefault();
+          setIsPlaying(false);
+          setSelectedIdx((i) => Math.min(filteredRedacted.length - 1, i + 1));
+          break;
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [filteredRedacted.length]);
+
+  const togglePlay = useCallback(() => {
+    if (selectedIdx >= filteredRedacted.length - 1) {
+      // Reset to beginning if at end
+      setSelectedIdx(0);
+    }
+    setIsPlaying((p) => !p);
+  }, [selectedIdx, filteredRedacted.length]);
+
+  const cycleSpeed = useCallback(() => {
+    setSpeedIdx((prev) => ((prev + 1) % AUTOPLAY_SPEEDS.length) as AutoplaySpeedIdx);
+  }, []);
 
   // Derive if spoilers is effectively active (director mode forces it)
   const effectiveSpoilers = spoilers || viewerMode === "director";
@@ -1563,10 +1653,7 @@ function ReplayViewer({
           <p className="text-xs text-muted-foreground">
             {events.length} events
             {filteredRedacted.length !== events.length && (
-              <span>
-                {" "}
-                ({filteredRedacted.length} shown)
-              </span>
+              <span> ({filteredRedacted.length} shown)</span>
             )}
             {errors.length > 0 && (
               <span className="text-amber-400"> · {errors.length} parse errors</span>
@@ -1575,20 +1662,10 @@ function ReplayViewer({
         </div>
 
         <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={firstEvent}
-            disabled={selectedIdx === 0}
-          >
+          <Button variant="ghost" size="icon" onClick={firstEvent} disabled={selectedIdx === 0}>
             <ChevronsLeft className="h-4 w-4" />
           </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={prevEvent}
-            disabled={selectedIdx === 0}
-          >
+          <Button variant="ghost" size="icon" onClick={prevEvent} disabled={selectedIdx === 0}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <span className="min-w-[4rem] text-center text-xs font-mono text-muted-foreground">
@@ -1609,6 +1686,26 @@ function ReplayViewer({
             disabled={selectedIdx === filteredRedacted.length - 1}
           >
             <ChevronsRight className="h-4 w-4" />
+          </Button>
+
+          {/* Autoplay controls */}
+          <Button
+            variant={isPlaying ? "default" : "outline"}
+            size="icon"
+            onClick={togglePlay}
+            title={isPlaying ? "Pause (Space)" : "Play (Space)"}
+          >
+            {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={cycleSpeed}
+            title="Cycle playback speed"
+            className="min-w-[3.5rem] font-mono text-xs"
+          >
+            <Gauge className="h-3 w-3" />
+            {AUTOPLAY_SPEEDS[speedIdx].label}
           </Button>
         </div>
 
@@ -1643,11 +1740,7 @@ function ReplayViewer({
           onClick={() => setSpoilers((s) => !s)}
           disabled={viewerMode === "director"}
         >
-          {effectiveSpoilers ? (
-            <Eye className="h-3 w-3" />
-          ) : (
-            <EyeOff className="h-3 w-3" />
-          )}
+          {effectiveSpoilers ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
           Spoilers {effectiveSpoilers ? "ON" : "OFF"}
         </Button>
 
@@ -1689,11 +1782,7 @@ function ReplayViewer({
 
       {/* Filters */}
       <div className="flex items-center gap-3">
-        <ReplayFilterBar
-          events={events}
-          filters={filters}
-          onFiltersChange={setFilters}
-        />
+        <ReplayFilterBar events={events} filters={filters} onFiltersChange={setFilters} />
         <div className="flex-1" />
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
           <span>Ordered by seq</span>
@@ -1718,18 +1807,34 @@ function ReplayViewer({
                 {moments.map((moment) => {
                   const isActive = moment.id === activeMoment?.id;
                   const range = momentRanges.get(moment.id);
+                  const style = momentTypeStyles[moment.type] ?? {
+                    badge: "bg-muted text-muted-foreground border-border",
+                    bg: "border-border",
+                  };
                   return (
                     <button
                       key={moment.id}
                       type="button"
                       onClick={() => jumpToMoment(moment)}
                       className={cn(
-                        "w-full rounded-md border border-transparent px-2 py-1.5 text-left text-xs transition",
-                        "hover:border-border hover:bg-muted/40",
-                        isActive && "border-primary/40 bg-primary/10 text-primary",
+                        "w-full rounded-md border px-2 py-1.5 text-left text-xs transition",
+                        "hover:bg-muted/40",
+                        isActive ? "border-primary/40 bg-primary/10 text-primary" : style.bg,
                       )}
                     >
-                      <p className="font-medium">{moment.label}</p>
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <span
+                          className={cn(
+                            "inline-block rounded px-1 py-0 text-[9px] font-medium border",
+                            style.badge,
+                          )}
+                        >
+                          {moment.type.replace(/_/g, " ")}
+                        </span>
+                      </div>
+                      <p className="font-medium">
+                        {safeMomentDescription(moment, effectiveSpoilers)}
+                      </p>
                       <p className="text-[0.7rem] text-muted-foreground">
                         {range
                           ? `Events ${range.startEventIdx + 1}\u2013${range.endEventIdx + 1}`
@@ -1764,9 +1869,7 @@ function ReplayViewer({
             <div className="space-y-4">
               {groups.map((group, gi) => (
                 <div key={gi}>
-                  <p className="mb-1 text-xs font-semibold text-muted-foreground">
-                    {group.label}
-                  </p>
+                  <p className="mb-1 text-xs font-semibold text-muted-foreground">{group.label}</p>
                   <div className="space-y-1">
                     {group.events.map((ev) => {
                       const flatIdx = filteredRedacted.indexOf(ev);
@@ -1863,10 +1966,7 @@ export default function ReplayPage() {
       }
 
       try {
-        const { events, errors, moments } = await loadMatchFromSource(
-          state.data.source,
-          matchKey,
-        );
+        const { events, errors, moments } = await loadMatchFromSource(state.data.source, matchKey);
         if (events.length === 0) {
           setLoadError(`No valid events found in match ${matchKey}`);
           return;
@@ -1894,10 +1994,7 @@ export default function ReplayPage() {
   if (state.mode === "idle") {
     return (
       <div className="space-y-4">
-        <FileDropZone
-          onLoad={handleSingleLoad}
-          onTournamentLoad={handleTournamentLoad}
-        />
+        <FileDropZone onLoad={handleSingleLoad} onTournamentLoad={handleTournamentLoad} />
         {loadError && (
           <div className="mx-auto max-w-xl">
             <div className="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
