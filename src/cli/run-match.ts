@@ -21,6 +21,8 @@ interface MatchCliArgs {
   out?: string;
   agentA: string;
   agentB: string;
+  agentAProvided: boolean;
+  agentBProvided: boolean;
   gateway?: "local" | "http";
   agentUrls: string[];
 
@@ -36,8 +38,8 @@ Options:
   --scenario <name>        Scenario to run (default: numberGuess)
   --seed <number>          RNG seed (default: 42)
   --turns <number>         Max turns (default: 20)
-  --agentA <name>          Agent A id (default: random)
-  --agentB <name>          Agent B id (default: baseline)
+  --agentA <name>          Agent A id (default: scenario-specific)
+  --agentB <name>          Agent B id (default: scenario-specific)
   --out <path>             Write JSONL events to a file
   --gateway <local|http>   Use gateway adapters
   --agent-urls <urls>      Comma-separated agent URLs (required for http)
@@ -63,6 +65,8 @@ export function parseArgs(argv: string[]): MatchCliArgs {
   let out: string | undefined;
   let agentA = "random";
   let agentB = "baseline";
+  let agentAProvided = false;
+  let agentBProvided = false;
   let gateway: "local" | "http" | undefined;
   let agentUrls: string[] = [];
 
@@ -82,8 +86,10 @@ export function parseArgs(argv: string[]): MatchCliArgs {
       out = argv[++i];
     } else if (arg === "--agentA" && i + 1 < argv.length) {
       agentA = argv[++i];
+      agentAProvided = true;
     } else if (arg === "--agentB" && i + 1 < argv.length) {
       agentB = argv[++i];
+      agentBProvided = true;
     } else if (arg === "--gateway" && i + 1 < argv.length) {
       const value = argv[++i];
       if (value === "local" || value === "http") {
@@ -110,12 +116,55 @@ export function parseArgs(argv: string[]): MatchCliArgs {
     out,
     agentA,
     agentB,
+    agentAProvided,
+    agentBProvided,
     gateway,
     agentUrls,
     emitProvenance,
     engineCommit,
     engineVersion,
   };
+}
+
+const SCENARIO_AGENT_DEFAULTS: Record<string, { agentA: string; agentB: string }> = {
+  numberGuess: { agentA: "random", agentB: "baseline" },
+  resourceRivals: { agentA: "randomBidder", agentB: "conservative" },
+  heist: { agentA: "noop", agentB: "noop" },
+};
+
+export function resolveAgentDefaults(args: MatchCliArgs): {
+  agentA: string;
+  agentB: string;
+  warning?: string;
+} {
+  const defaults = SCENARIO_AGENT_DEFAULTS[args.scenario];
+  let agentA = args.agentA;
+  let agentB = args.agentB;
+  let warning: string | undefined;
+
+  if (!args.agentAProvided || !args.agentBProvided) {
+    if (defaults) {
+      if (!args.agentAProvided) {
+        agentA = defaults.agentA;
+      }
+      if (!args.agentBProvided) {
+        agentB = defaults.agentB;
+      }
+    } else if (!args.agentAProvided && !args.agentBProvided) {
+      agentA = "noop";
+      agentB = "noop";
+      warning = `Warning: No default agents for scenario \"${args.scenario}\". Using noop agents.\nSpecify --agentA and --agentB for meaningful results.`;
+    } else {
+      if (!args.agentAProvided) {
+        agentA = "noop";
+      }
+      if (!args.agentBProvided) {
+        agentB = "noop";
+      }
+    }
+  }
+
+  return { agentA, agentB, warning };
 }
 
 function tryReadEngineCommit(): string | undefined {
@@ -148,6 +197,12 @@ function tryReadEngineVersion(): string | undefined {
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
+  const resolvedAgents = resolveAgentDefaults(args);
+
+  if (resolvedAgents.warning) {
+    // eslint-disable-next-line no-console
+    console.warn(resolvedAgents.warning);
+  }
 
   // Validate scenario (getScenarioFactory throws with available options on unknown key)
   let scenarioFactory;
@@ -163,14 +218,14 @@ async function main(): Promise<void> {
   let agentAFactory;
   let agentBFactory;
   try {
-    agentAFactory = getAgentFactory(args.agentA);
+    agentAFactory = getAgentFactory(resolvedAgents.agentA);
   } catch (err: unknown) {
     // eslint-disable-next-line no-console
     console.error(err instanceof Error ? err.message : String(err));
     process.exit(1);
   }
   try {
-    agentBFactory = getAgentFactory(args.agentB);
+    agentBFactory = getAgentFactory(resolvedAgents.agentB);
   } catch (err: unknown) {
     // eslint-disable-next-line no-console
     console.error(err instanceof Error ? err.message : String(err));
@@ -178,7 +233,10 @@ async function main(): Promise<void> {
   }
 
   const scenario = scenarioFactory();
-  const agents = [agentAFactory(`${args.agentA}-0`), agentBFactory(`${args.agentB}-1`)];
+  const agents = [
+    agentAFactory(`${resolvedAgents.agentA}-0`),
+    agentBFactory(`${resolvedAgents.agentB}-1`),
+  ];
 
   // Opt-in provenance: only include if explicitly requested AND at least one field resolves.
   let provenance:

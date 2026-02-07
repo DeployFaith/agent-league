@@ -20,8 +20,11 @@ export function createRandomBidderAgent(
       // Stateless — nothing to initialize.
     },
     act(observation: ResourceRivalsObservation, ctx: AgentContext): ResourceRivalsAction {
-      const remaining = observation._private.remainingResources;
-      if (remaining <= 0) {
+      const obs = observation as unknown as Record<string, unknown>;
+      const privateObs = obs._private as Record<string, unknown> | undefined;
+      const remaining = Number(privateObs?.remainingResources);
+
+      if (!Number.isFinite(remaining) || remaining <= 0) {
         return { bid: 0 };
       }
       // Bid between 0 and remaining (uniform random)

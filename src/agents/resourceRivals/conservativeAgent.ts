@@ -21,10 +21,19 @@ export function createConservativeAgent(
       // Stateless — nothing to initialize.
     },
     act(observation: ResourceRivalsObservation, ctx: AgentContext): ResourceRivalsAction {
-      const remaining = observation._private.remainingResources;
-      const objectivesLeft = observation.objectivesRemaining;
+      const obs = observation as unknown as Record<string, unknown>;
+      const privateObs = obs._private as Record<string, unknown> | undefined;
+      const remaining = Number(privateObs?.remainingResources);
+      const objectivesLeft = Number(obs.objectivesRemaining);
+      const objectiveValue = Number(obs.objectiveValue);
 
-      if (remaining <= 0 || objectivesLeft <= 0) {
+      if (
+        !Number.isFinite(remaining) ||
+        !Number.isFinite(objectivesLeft) ||
+        !Number.isFinite(objectiveValue) ||
+        remaining <= 0 ||
+        objectivesLeft <= 0
+      ) {
         return { bid: 0 };
       }
 
@@ -33,7 +42,7 @@ export function createConservativeAgent(
 
       // Value-weighted adjustment: bid more for valuable objectives
       // Use a simple proportion relative to a "typical" objective value of 15
-      const valueFactor = Math.min(observation.objectiveValue / 15, 2);
+      const valueFactor = Math.min(objectiveValue / 15, 2);
       const adjustedBid = Math.floor(baseBid * valueFactor);
 
       // Add small random perturbation (±10% of base) to avoid predictability

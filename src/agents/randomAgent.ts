@@ -14,7 +14,15 @@ export function createRandomAgent(id: AgentId): Agent<NumberGuessObservation, Nu
       // stateless — nothing to initialize
     },
     act(observation: NumberGuessObservation, ctx: AgentContext): NumberGuessAction {
-      return { guess: randomInt(ctx.rng, observation.rangeMin, observation.rangeMax) };
+      const obs = observation as unknown as Record<string, unknown>;
+      const rangeMin = Number(obs.rangeMin);
+      const rangeMax = Number(obs.rangeMax);
+
+      if (!Number.isFinite(rangeMin) || !Number.isFinite(rangeMax) || rangeMax < rangeMin) {
+        return { guess: 0 };
+      }
+
+      return { guess: randomInt(ctx.rng, rangeMin, rangeMax) };
     },
   };
 }
