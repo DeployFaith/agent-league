@@ -45,5 +45,5 @@ export type {
   HeistRoomCountConfig,
 } from "./games/heist/generatorTypes.js";
 
-export { generateHeistScenario } from "./games/heist/generator.js";
-
+export { generateHeistScenario, HEIST_PRESETS } from "./games/heist/generator.js";
+export { generateDescription, generatePreview } from "./games/heist/preview.js";

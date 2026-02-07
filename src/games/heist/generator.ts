@@ -64,6 +64,23 @@ type HeistGeneratorConfigInput = Partial<HeistGeneratorConfig> & {
   preset?: string;
 };
 
+export const HEIST_PRESETS: Record<string, HeistGeneratorConfig> = {
+  warehouse_breakin: {
+    rooms: { exact: 7 },
+    branchingFactor: 2,
+    loopCount: 0,
+    securityDensity: { guards: 1, cameras: 1 },
+    hazardsEnabled: false,
+    maxTurns: 6,
+    difficultyPreset: "normal",
+    skin: {
+      themeName: "Warehouse Break-in",
+      flavorText:
+        "A corporate whistleblower's evidence is locked in a downtown warehouse vault.",
+    },
+  },
+};
+
 interface RoomAssignment {
   rooms: HeistRoom[];
   roomByType: Record<HeistRoomType, string[]>;
@@ -425,13 +442,15 @@ export function generateHeistScenario(
   seed?: Seed,
 ): HeistScenarioParams {
   const { seed: embeddedSeed, preset, ...rawConfig } = config;
-  void preset;
+  const presetConfig = preset ? HEIST_PRESETS[preset] : undefined;
   const normalizedConfig: HeistGeneratorConfig = {
     ...DEFAULT_CONFIG,
+    ...(presetConfig ?? {}),
     ...rawConfig,
-    rooms: rawConfig.rooms ?? DEFAULT_CONFIG.rooms,
+    rooms: rawConfig.rooms ?? presetConfig?.rooms ?? DEFAULT_CONFIG.rooms,
     securityDensity: {
       ...DEFAULT_CONFIG.securityDensity,
+      ...presetConfig?.securityDensity,
       ...rawConfig.securityDensity,
     },
   };
