@@ -8,3 +8,24 @@ export type {
   CommentaryFile,
   CommentaryLoadStatus,
 } from "./lib/replay/commentary.js";
+
+export type {
+  HeistRoomType,
+  HeistDoor,
+  HeistRoom,
+  HeistMap,
+  HeistEntity,
+  HeistItem,
+  HeistRules,
+  HeistScoring,
+  HeistWinCondition,
+  HeistSkin,
+  HeistScenarioParams,
+  HeistScenarioParamsSchemaType,
+} from "./games/heist/types.js";
+
+export {
+  HeistScenarioParamsSchema,
+  validateHeistScenarioParams,
+  assertHeistScenarioParams,
+} from "./games/heist/types.js";
