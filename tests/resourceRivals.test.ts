@@ -223,7 +223,7 @@ describe("ResourceRivals full match", () => {
     expect(redacted.summary).toContain("[partially redacted]");
   });
 
-  it("director mode preserves _private fields", () => {
+  it("director mode strips _private from displayRaw but keeps fullRaw", () => {
     const scenario = createResourceRivalsScenario();
     const agents = [createRandomBidderAgent("alice"), createConservativeAgent("bob")];
     const result = runMatch(scenario, agents, { seed: 42, maxTurns: 30 });
@@ -232,9 +232,11 @@ describe("ResourceRivals full match", () => {
     const replay = matchEventToReplayEvent(obsEvent!);
     const redacted = redactEvent(replay, { mode: "director", revealSpoilers: false });
 
-    expect(redacted.isRedacted).toBe(false);
+    expect(redacted.isRedacted).toBe(true);
     const obs = redacted.displayRaw.observation as Record<string, unknown>;
-    expect(obs._private).toBeDefined();
+    expect(obs._private).toBeUndefined();
+    expect(redacted.fullRaw).not.toBeNull();
+    expect((redacted.fullRaw?.observation as Record<string, unknown>)._private).toBeDefined();
   });
 
   it("generates meaningful moments from match events", () => {

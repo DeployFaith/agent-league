@@ -71,9 +71,9 @@ function cloneRaw(raw: Record<string, unknown>): Record<string, unknown> {
 }
 
 /**
- * Recursively strip all `_private` keys from a value.
+ * Recursively strip all `_private*` keys from a value.
  *
- * Convention: any object may include a `_private` key whose value holds fields
+ * Convention: any object may include a `_private`-prefixed key whose value holds fields
  * that must be hidden in spectator mode.  This helper removes every `_private`
  * key at any depth in the object tree (including inside arrays) and returns a
  * new deep-cloned structure.
@@ -95,10 +95,10 @@ function stripPrivateFields(value: unknown): { result: unknown; stripped: boolea
 
   if (typeof value === "object" && value !== null) {
     const obj = value as Record<string, unknown>;
-    let anyStripped = "_private" in obj;
+    let anyStripped = Object.keys(obj).some((key) => key.startsWith("_private"));
     const out: Record<string, unknown> = {};
     for (const [key, val] of Object.entries(obj)) {
-      if (key === "_private") {
+      if (key.startsWith("_private")) {
         continue;
       }
       const { result, stripped } = stripPrivateFields(val);
@@ -114,7 +114,7 @@ function stripPrivateFields(value: unknown): { result: unknown; stripped: boolea
 }
 
 /**
- * Check whether a value contains any `_private` key at any depth.
+ * Check whether a value contains any `_private*` key at any depth.
  */
 function hasPrivateFields(value: unknown): boolean {
   if (Array.isArray(value)) {
@@ -122,10 +122,12 @@ function hasPrivateFields(value: unknown): boolean {
   }
   if (typeof value === "object" && value !== null) {
     const obj = value as Record<string, unknown>;
-    if ("_private" in obj) {
-      return true;
-    }
-    return Object.values(obj).some(hasPrivateFields);
+    return Object.entries(obj).some(([key, entryValue]) => {
+      if (key.startsWith("_private")) {
+        return true;
+      }
+      return hasPrivateFields(entryValue);
+    });
   }
   return false;
 }
@@ -247,6 +249,10 @@ const DEFAULT_OPTIONS: RedactionOptions = {
 export function redactEvent(event: ReplayEvent, opts?: Partial<RedactionOptions>): RedactedEvent {
   const options: RedactionOptions = { ...DEFAULT_OPTIONS, ...opts };
   const redacted = shouldRedact(event, options);
+  const baseDisplayRaw = redacted ? redactEventRaw(event) : cloneRaw(event.raw);
+  const { result: strippedDisplayRaw, stripped } = stripPrivateFields(baseDisplayRaw);
+  const displayRaw = strippedDisplayRaw as Record<string, unknown>;
+  const isRedacted = redacted || stripped;
 
   return {
     type: event.type,
@@ -255,9 +261,9 @@ export function redactEvent(event: ReplayEvent, opts?: Partial<RedactionOptions>
     originalIdx: -1,
     turn: event.turn,
     agentId: event.agentId,
-    isRedacted: redacted,
-    summary: buildSummary(event, redacted),
-    displayRaw: redacted ? redactEventRaw(event) : cloneRaw(event.raw),
+    isRedacted,
+    summary: buildSummary(event, isRedacted),
+    displayRaw,
     fullRaw: options.revealSpoilers || options.mode === "director" ? cloneRaw(event.raw) : null,
   };
 }
