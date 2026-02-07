@@ -122,6 +122,7 @@ describe("redaction audit (Resource Rivals fixture)", () => {
     }
 
     for (const summary of summaries) {
+      // eslint-disable-next-line no-console -- informational derivability output
       console.info(
         `[redaction-audit] derived resources for ${summary.matchPath}`,
         summary.resources,
