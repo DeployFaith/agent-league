@@ -20,11 +20,11 @@ function emit(
  *
  * Pure computation — no I/O. The caller decides what to do with the events.
  */
-function runMatchStandard<TState, TObs, TAct>(
+async function runMatchStandard<TState, TObs, TAct>(
   scenario: Scenario<TState, TObs, TAct>,
   agents: Agent<TObs, TAct>[],
   config: MatchRunnerConfig,
-): MatchResult {
+): Promise<MatchResult> {
   const events: MatchEvent[] = [];
   const seq = { value: 0 };
 
@@ -93,7 +93,7 @@ function runMatchStandard<TState, TObs, TAct>(
           turn,
           agentId: agent.id,
         };
-        action = agent.act(observation, ctx);
+        action = await agent.act(observation, ctx);
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         emit(events, seq, matchId, { type: "AgentError", agentId: agent.id, turn, message });
@@ -141,20 +141,20 @@ function runMatchStandard<TState, TObs, TAct>(
   return { matchId, seed: config.seed, scores, events, turns: turn };
 }
 
-export function runMatch<TState, TObs, TAct>(
+export async function runMatch<TState, TObs, TAct>(
   scenario: Scenario<TState, TObs, TAct>,
   agents: Agent<TObs, TAct>[],
   config: MatchRunnerConfig,
-): MatchResult {
+): Promise<MatchResult> {
   const isHeistCompetitive = scenario.name === "Heist" && agents.length === 2;
   if (!isHeistCompetitive) {
     return runMatchStandard(scenario, agents, config);
   }
 
   const [agentA, agentB] = agents;
-  const resultA = runMatchStandard(scenario, [agentA], config);
+  const resultA = await runMatchStandard(scenario, [agentA], config);
   const matchId = config.matchId ?? resultA.matchId;
-  const resultB = runMatchStandard(scenario, [agentB], { ...config, matchId });
+  const resultB = await runMatchStandard(scenario, [agentB], { ...config, matchId });
 
   return combineHeistRuns(scenario.name, { ...config, matchId }, [agentA.id, agentB.id], [
     { agentId: agentA.id, result: resultA },

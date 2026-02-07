@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { AgentId } from "../contract/types.js";
 import { computeArtifactContentHash } from "../core/hash.js";
 import type { MatchManifestAgent, MatchManifestScenario, TournamentResult } from "./types.js";
+import { getAgentProvenanceDescriptor } from "./runTournament.js";
 
 const RUNTIME_ROOT = join(process.cwd(), "src");
 const REPO_ROOT = process.cwd();
@@ -11,6 +12,7 @@ const HASH_EXCLUDE_EXTENSIONS = [".d.ts", ".map"];
 const SCENARIO_PATHS: Record<string, string> = {
   numberGuess: "scenarios/numberGuess",
   resourceRivals: "scenarios/resourceRivals",
+  heist: "scenarios/heist",
 };
 
 const AGENT_PATHS: Record<string, string> = {
@@ -19,6 +21,7 @@ const AGENT_PATHS: Record<string, string> = {
   noop: "agents/noopAgent",
   randomBidder: "agents/resourceRivals/randomBidder",
   conservative: "agents/resourceRivals/conservativeAgent",
+  "ollama-heist": "agents/ollama",
 };
 
 function resolveDirectoryPath(relativePath: string): string {
@@ -33,10 +36,13 @@ function resolveDirectoryPath(relativePath: string): string {
   return relativePath;
 }
 
-function resolveFilePath(relativePath: string): string {
+function resolveArtifactPath(relativePath: string): string {
   const directPath = join(RUNTIME_ROOT, relativePath);
-  if (existsSync(directPath) && statSync(directPath).isFile()) {
-    return relativePath;
+  if (existsSync(directPath)) {
+    const stats = statSync(directPath);
+    if (stats.isDirectory() || stats.isFile()) {
+      return relativePath;
+    }
   }
   const extensions = [".ts", ".js"];
   for (const ext of extensions) {
@@ -46,7 +52,7 @@ function resolveFilePath(relativePath: string): string {
       return candidate;
     }
   }
-  throw new Error(`Missing artifact file: ${directPath}`);
+  throw new Error(`Missing artifact path: ${directPath}`);
 }
 
 function readPackageVersion(): string {
@@ -106,10 +112,21 @@ export async function buildMatchManifestProvenanceFromConfig(
     }
     const contentHash = await computeArtifactContentHash({
       rootDir: RUNTIME_ROOT,
-      includePaths: [resolveFilePath(agentPath)],
+      includePaths: [resolveArtifactPath(agentPath)],
       excludeExtensions: HASH_EXCLUDE_EXTENSIONS,
     });
     agentContentHashes.set(agentKey, contentHash);
+  }
+
+  const agentMetadataByKey = new Map<string, MatchManifestAgent["metadata"]>();
+  for (const agentKey of config.agentKeys) {
+    if (agentMetadataByKey.has(agentKey)) {
+      continue;
+    }
+    const descriptor = getAgentProvenanceDescriptor(agentKey);
+    if (descriptor?.metadata) {
+      agentMetadataByKey.set(agentKey, descriptor.metadata);
+    }
   }
 
   const agentsById = new Map<AgentId, MatchManifestAgent>();
@@ -119,10 +136,12 @@ export async function buildMatchManifestProvenanceFromConfig(
     if (!contentHash) {
       throw new Error(`Missing agent hash for "${agentKey}"`);
     }
+    const metadata = agentMetadataByKey.get(agentKey);
     agentsById.set(agentId, {
       id: agentId,
       version: artifactVersion,
       contentHash,
+      ...(metadata ? { metadata } : {}),
     });
   });
 

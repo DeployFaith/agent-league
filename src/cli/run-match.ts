@@ -299,7 +299,7 @@ async function main(): Promise<void> {
       gatewayConfig,
     );
   } else {
-    result = runMatch(scenario, agents, {
+    result = await runMatch(scenario, agents, {
       seed: args.seed,
       maxTurns: args.turns,
       ...(provenance ? { provenance } : {}),

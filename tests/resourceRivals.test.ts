@@ -162,10 +162,10 @@ describe("ResourceRivals scenario", () => {
 // ---------------------------------------------------------------------------
 
 describe("ResourceRivals full match", () => {
-  it("runs a complete match with random agents", () => {
+  it("runs a complete match with random agents", async () => {
     const scenario = createResourceRivalsScenario();
     const agents = [createRandomBidderAgent("alice"), createConservativeAgent("bob")];
-    const result = runMatch(scenario, agents, { seed: 42, maxTurns: 30 });
+    const result = await runMatch(scenario, agents, { seed: 42, maxTurns: 30 });
 
     expect(result.events.length).toBeGreaterThan(0);
     expect(result.scores.alice).toBeDefined();
@@ -176,23 +176,23 @@ describe("ResourceRivals full match", () => {
     expect(matchEnded).toBeDefined();
   });
 
-  it("produces deterministic results from same seed", () => {
+  it("produces deterministic results from same seed", async () => {
     const scenario1 = createResourceRivalsScenario();
     const scenario2 = createResourceRivalsScenario();
     const agents1 = [createRandomBidderAgent("alice"), createConservativeAgent("bob")];
     const agents2 = [createRandomBidderAgent("alice"), createConservativeAgent("bob")];
 
-    const result1 = runMatch(scenario1, agents1, { seed: 42, maxTurns: 30 });
-    const result2 = runMatch(scenario2, agents2, { seed: 42, maxTurns: 30 });
+    const result1 = await runMatch(scenario1, agents1, { seed: 42, maxTurns: 30 });
+    const result2 = await runMatch(scenario2, agents2, { seed: 42, maxTurns: 30 });
 
     expect(result1.scores).toEqual(result2.scores);
     expect(result1.events.length).toBe(result2.events.length);
   });
 
-  it("observations use _private convention", () => {
+  it("observations use _private convention", async () => {
     const scenario = createResourceRivalsScenario();
     const agents = [createRandomBidderAgent("alice"), createConservativeAgent("bob")];
-    const result = runMatch(scenario, agents, { seed: 42, maxTurns: 30 });
+    const result = await runMatch(scenario, agents, { seed: 42, maxTurns: 30 });
 
     const obsEvents = result.events.filter((e) => e.type === "ObservationEmitted");
     expect(obsEvents.length).toBeGreaterThan(0);
@@ -205,10 +205,10 @@ describe("ResourceRivals full match", () => {
     }
   });
 
-  it("spectator redaction strips remainingResources", () => {
+  it("spectator redaction strips remainingResources", async () => {
     const scenario = createResourceRivalsScenario();
     const agents = [createRandomBidderAgent("alice"), createConservativeAgent("bob")];
-    const result = runMatch(scenario, agents, { seed: 42, maxTurns: 30 });
+    const result = await runMatch(scenario, agents, { seed: 42, maxTurns: 30 });
 
     const obsEvent = result.events.find((e) => e.type === "ObservationEmitted");
     expect(obsEvent).toBeDefined();
@@ -223,10 +223,10 @@ describe("ResourceRivals full match", () => {
     expect(redacted.summary).toContain("[partially redacted]");
   });
 
-  it("director mode strips _private from displayRaw but keeps fullRaw", () => {
+  it("director mode strips _private from displayRaw but keeps fullRaw", async () => {
     const scenario = createResourceRivalsScenario();
     const agents = [createRandomBidderAgent("alice"), createConservativeAgent("bob")];
-    const result = runMatch(scenario, agents, { seed: 42, maxTurns: 30 });
+    const result = await runMatch(scenario, agents, { seed: 42, maxTurns: 30 });
 
     const obsEvent = result.events.find((e) => e.type === "ObservationEmitted");
     const replay = matchEventToReplayEvent(obsEvent!);
@@ -239,10 +239,10 @@ describe("ResourceRivals full match", () => {
     expect((redacted.fullRaw?.observation as Record<string, unknown>)._private).toBeDefined();
   });
 
-  it("generates meaningful moments from match events", () => {
+  it("generates meaningful moments from match events", async () => {
     const scenario = createResourceRivalsScenario();
     const agents = [createRandomBidderAgent("alice"), createConservativeAgent("bob")];
-    const result = runMatch(scenario, agents, { seed: 42, maxTurns: 30 });
+    const result = await runMatch(scenario, agents, { seed: 42, maxTurns: 30 });
 
     const moments = detectMoments(result.events);
     // A match between random and conservative should produce at least some

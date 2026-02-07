@@ -26,16 +26,16 @@ function collectNumbers(value: unknown, numbers: number[]): void {
 }
 
 describe("noop agent smoke tests", () => {
-  it("runs matches without crashing across scenarios", () => {
+  it("runs matches without crashing across scenarios", async () => {
     const scenarioKeys = ["heist", "numberGuess", "resourceRivals"];
 
-    scenarioKeys.forEach((scenarioKey) => {
+    for (const scenarioKey of scenarioKeys) {
       const scenario = getScenarioFactory(scenarioKey)();
       const agents = [createNoopAgent("noop-0"), createNoopAgent("noop-1")];
-      const result = runMatch(scenario, agents, { seed: 1, maxTurns: 5 });
+      const result = await runMatch(scenario, agents, { seed: 1, maxTurns: 5 });
       const lastEvent = result.events[result.events.length - 1];
       expect(lastEvent?.type).toBe("MatchEnded");
-    });
+    }
   });
 });
 

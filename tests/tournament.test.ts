@@ -15,44 +15,44 @@ function makeConfig(overrides: Partial<TournamentConfig> = {}): TournamentConfig
 
 describe("Tournament Harness v0.1", () => {
   describe("determinism", () => {
-    it("same config produces identical results", () => {
+    it("same config produces identical results", async () => {
       const config = makeConfig({ seed: 123, rounds: 2 });
-      const result1 = runTournament(config);
-      const result2 = runTournament(config);
+      const result1 = await runTournament(config);
+      const result2 = await runTournament(config);
 
       expect(JSON.stringify(result1)).toBe(JSON.stringify(result2));
     });
 
-    it("deterministic across multiple seeds", () => {
+    it("deterministic across multiple seeds", async () => {
       for (const seed of [0, 1, 42, 999, 2147483647]) {
         const config = makeConfig({ seed });
-        const a = runTournament(config);
-        const b = runTournament(config);
+        const a = await runTournament(config);
+        const b = await runTournament(config);
         expect(JSON.stringify(a)).toBe(JSON.stringify(b));
       }
     });
 
-    it("different seeds produce different results", () => {
-      const r1 = runTournament(makeConfig({ seed: 1 }));
-      const r2 = runTournament(makeConfig({ seed: 999 }));
+    it("different seeds produce different results", async () => {
+      const r1 = await runTournament(makeConfig({ seed: 1 }));
+      const r2 = await runTournament(makeConfig({ seed: 999 }));
       expect(JSON.stringify(r1.matchSummaries)).not.toBe(JSON.stringify(r2.matchSummaries));
     });
   });
 
   describe("match count", () => {
-    it("2 agents, 1 round => 1 match", () => {
-      const result = runTournament(makeConfig({ rounds: 1 }));
+    it("2 agents, 1 round => 1 match", async () => {
+      const result = await runTournament(makeConfig({ rounds: 1 }));
       expect(result.matchSummaries).toHaveLength(1);
     });
 
-    it("2 agents, 3 rounds => 3 matches", () => {
-      const result = runTournament(makeConfig({ rounds: 3 }));
+    it("2 agents, 3 rounds => 3 matches", async () => {
+      const result = await runTournament(makeConfig({ rounds: 3 }));
       expect(result.matchSummaries).toHaveLength(3);
     });
 
-    it("N agents, R rounds => R * N*(N-1)/2 matches", () => {
+    it("N agents, R rounds => R * N*(N-1)/2 matches", async () => {
       // With 2 agents and 5 rounds: 5 * 2*1/2 = 5
-      const result = runTournament(makeConfig({ rounds: 5 }));
+      const result = await runTournament(makeConfig({ rounds: 5 }));
       const n = 2;
       const r = 5;
       const expected = r * ((n * (n - 1)) / 2);
@@ -61,9 +61,9 @@ describe("Tournament Harness v0.1", () => {
   });
 
   describe("standings", () => {
-    it("contains all agents exactly once", () => {
+    it("contains all agents exactly once", async () => {
       const config = makeConfig({ rounds: 2 });
-      const result = runTournament(config);
+      const result = await runTournament(config);
 
       const standingIds = result.standings.map((s) => s.agentId).sort();
       expect(standingIds).toHaveLength(config.agentKeys.length);
@@ -71,9 +71,9 @@ describe("Tournament Harness v0.1", () => {
       expect(new Set(standingIds).size).toBe(config.agentKeys.length);
     });
 
-    it("match counts in standings equal total matches per agent", () => {
+    it("match counts in standings equal total matches per agent", async () => {
       const config = makeConfig({ rounds: 3 });
-      const result = runTournament(config);
+      const result = await runTournament(config);
 
       for (const row of result.standings) {
         // With 2 agents, each plays every round = 3 matches
@@ -82,24 +82,24 @@ describe("Tournament Harness v0.1", () => {
       }
     });
 
-    it("points follow win=3, draw=1, loss=0 rule", () => {
-      const result = runTournament(makeConfig({ rounds: 5 }));
+    it("points follow win=3, draw=1, loss=0 rule", async () => {
+      const result = await runTournament(makeConfig({ rounds: 5 }));
 
       for (const row of result.standings) {
         expect(row.points).toBe(row.wins * 3 + row.draws * 1 + row.losses * 0);
       }
     });
 
-    it("standings are sorted by points descending", () => {
-      const result = runTournament(makeConfig({ seed: 42, rounds: 3 }));
+    it("standings are sorted by points descending", async () => {
+      const result = await runTournament(makeConfig({ seed: 42, rounds: 3 }));
 
       for (let i = 1; i < result.standings.length; i++) {
         expect(result.standings[i - 1].points).toBeGreaterThanOrEqual(result.standings[i].points);
       }
     });
 
-    it("scoreDiff equals scoreFor minus scoreAgainst", () => {
-      const result = runTournament(makeConfig({ rounds: 3 }));
+    it("scoreDiff equals scoreFor minus scoreAgainst", async () => {
+      const result = await runTournament(makeConfig({ rounds: 3 }));
 
       for (const row of result.standings) {
         expect(row.scoreDiff).toBe(row.scoreFor - row.scoreAgainst);
@@ -108,15 +108,15 @@ describe("Tournament Harness v0.1", () => {
   });
 
   describe("match summaries", () => {
-    it("each match has exactly 2 agentIds", () => {
-      const result = runTournament(makeConfig({ rounds: 2 }));
+    it("each match has exactly 2 agentIds", async () => {
+      const result = await runTournament(makeConfig({ rounds: 2 }));
       for (const m of result.matchSummaries) {
         expect(m.agentIds).toHaveLength(2);
       }
     });
 
-    it("winner is null (draw) or one of the participating agents", () => {
-      const result = runTournament(makeConfig({ rounds: 3 }));
+    it("winner is null (draw) or one of the participating agents", async () => {
+      const result = await runTournament(makeConfig({ rounds: 3 }));
       for (const m of result.matchSummaries) {
         if (m.winner !== null) {
           expect(m.agentIds).toContain(m.winner);
@@ -124,16 +124,16 @@ describe("Tournament Harness v0.1", () => {
       }
     });
 
-    it("config is preserved in result", () => {
+    it("config is preserved in result", async () => {
       const config = makeConfig({ seed: 777, rounds: 2 });
-      const result = runTournament(config);
+      const result = await runTournament(config);
       expect(result.config).toEqual(config);
     });
   });
 
   describe("event logs", () => {
-    it("event logs present when includeEventLogs is true", () => {
-      const result = runTournament(makeConfig({ seed: 42, rounds: 2, includeEventLogs: true }));
+    it("event logs present when includeEventLogs is true", async () => {
+      const result = await runTournament(makeConfig({ seed: 42, rounds: 2, includeEventLogs: true }));
 
       expect(result.matchLogs).toBeDefined();
       for (const m of result.matchSummaries) {
@@ -145,15 +145,15 @@ describe("Tournament Harness v0.1", () => {
       }
     });
 
-    it("event logs absent when includeEventLogs is not set", () => {
-      const result = runTournament(makeConfig({ seed: 42 }));
+    it("event logs absent when includeEventLogs is not set", async () => {
+      const result = await runTournament(makeConfig({ seed: 42 }));
       expect(result.matchLogs).toBeUndefined();
     });
 
-    it("event logs are deterministic", () => {
+    it("event logs are deterministic", async () => {
       const config = makeConfig({ seed: 123, rounds: 2, includeEventLogs: true });
-      const r1 = runTournament(config);
-      const r2 = runTournament(config);
+      const r1 = await runTournament(config);
+      const r2 = await runTournament(config);
       expect(JSON.stringify(r1.matchLogs)).toBe(JSON.stringify(r2.matchLogs));
     });
   });

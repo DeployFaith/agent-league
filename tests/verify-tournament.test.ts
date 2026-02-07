@@ -22,7 +22,7 @@ function makeConfig(overrides: Partial<TournamentConfig> = {}): TournamentConfig
 
 async function setupTournamentDir() {
   const dir = mkdtempSync(join(tmpdir(), "hashmatch-verify-tour-"));
-  const result = runTournament(makeConfig());
+  const result = await runTournament(makeConfig());
   await writeTournamentArtifacts(result, dir);
   const matchKey = result.matchSummaries[0].matchKey;
   const matchDir = join(dir, "matches", matchKey);

@@ -27,6 +27,7 @@ export interface MatchManifestAgent {
   id: AgentId;
   version: string | null;
   contentHash: string | null;
+  metadata?: Record<string, JsonValue>;
 }
 
 export interface MatchManifestScenario {

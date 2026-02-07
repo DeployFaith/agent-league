@@ -26,7 +26,7 @@ describe("Match manifest provenance hashes", () => {
     const dir = mkdtempSync(join(tmpdir(), "hashmatch-provenance-"));
 
     try {
-      const result = runTournament(makeConfig());
+      const result = await runTournament(makeConfig());
       await writeTournamentArtifacts(result, dir);
 
       const matchDir = join(dir, "matches", result.matchSummaries[0].matchKey);
@@ -53,8 +53,8 @@ describe("Match manifest provenance hashes", () => {
 
     try {
       const config = makeConfig({ seed: 202 });
-      const resultA = runTournament(config);
-      const resultB = runTournament(config);
+      const resultA = await runTournament(config);
+      const resultB = await runTournament(config);
 
       await writeTournamentArtifacts(resultA, dirA);
       await writeTournamentArtifacts(resultB, dirB);

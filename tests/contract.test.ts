@@ -15,28 +15,28 @@ function makeScenario() {
 
 describe("Contract v0 — Match Runner", () => {
   describe("determinism", () => {
-    it("same seed + same agents => identical event log", () => {
-      const result1 = runMatch(makeScenario(), makeAgents(), { seed: 123, maxTurns: 20 });
-      const result2 = runMatch(makeScenario(), makeAgents(), { seed: 123, maxTurns: 20 });
+    it("same seed + same agents => identical event log", async () => {
+      const result1 = await runMatch(makeScenario(), makeAgents(), { seed: 123, maxTurns: 20 });
+      const result2 = await runMatch(makeScenario(), makeAgents(), { seed: 123, maxTurns: 20 });
 
       expect(result1.events).toEqual(result2.events);
       expect(result1.scores).toEqual(result2.scores);
       expect(result1.matchId).toBe(result2.matchId);
     });
 
-    it("deterministic across multiple runs with different seeds", () => {
+    it("deterministic across multiple runs with different seeds", async () => {
       for (const seed of [0, 1, 42, 999, 2147483647]) {
-        const a = runMatch(makeScenario(), makeAgents(), { seed, maxTurns: 15 });
-        const b = runMatch(makeScenario(), makeAgents(), { seed, maxTurns: 15 });
+        const a = await runMatch(makeScenario(), makeAgents(), { seed, maxTurns: 15 });
+        const b = await runMatch(makeScenario(), makeAgents(), { seed, maxTurns: 15 });
         expect(a.events).toEqual(b.events);
       }
     });
   });
 
   describe("variation", () => {
-    it("different seed => different events", () => {
-      const r1 = runMatch(makeScenario(), makeAgents(), { seed: 1, maxTurns: 20 });
-      const r2 = runMatch(makeScenario(), makeAgents(), { seed: 999, maxTurns: 20 });
+    it("different seed => different events", async () => {
+      const r1 = await runMatch(makeScenario(), makeAgents(), { seed: 1, maxTurns: 20 });
+      const r2 = await runMatch(makeScenario(), makeAgents(), { seed: 999, maxTurns: 20 });
 
       const json1 = JSON.stringify(r1.events);
       const json2 = JSON.stringify(r2.events);
@@ -45,39 +45,39 @@ describe("Contract v0 — Match Runner", () => {
   });
 
   describe("runner safety", () => {
-    it("respects maxTurns", () => {
-      const result = runMatch(makeScenario(), makeAgents(), { seed: 42, maxTurns: 3 });
+    it("respects maxTurns", async () => {
+      const result = await runMatch(makeScenario(), makeAgents(), { seed: 42, maxTurns: 3 });
       expect(result.turns).toBeLessThanOrEqual(3);
     });
 
-    it("always produces MatchStarted as first event", () => {
-      const result = runMatch(makeScenario(), makeAgents(), { seed: 42, maxTurns: 20 });
+    it("always produces MatchStarted as first event", async () => {
+      const result = await runMatch(makeScenario(), makeAgents(), { seed: 42, maxTurns: 20 });
       expect(result.events[0].type).toBe("MatchStarted");
     });
 
-    it("always produces MatchEnded as last event", () => {
-      const result = runMatch(makeScenario(), makeAgents(), { seed: 42, maxTurns: 20 });
+    it("always produces MatchEnded as last event", async () => {
+      const result = await runMatch(makeScenario(), makeAgents(), { seed: 42, maxTurns: 20 });
       const last = result.events[result.events.length - 1];
       expect(last.type).toBe("MatchEnded");
     });
 
-    it("MatchEnded reason is 'completed' when scenario terminates early", () => {
-      const result = runMatch(makeScenario(), makeAgents(), { seed: 42, maxTurns: 100 });
+    it("MatchEnded reason is 'completed' when scenario terminates early", async () => {
+      const result = await runMatch(makeScenario(), makeAgents(), { seed: 42, maxTurns: 100 });
       const ended = result.events[result.events.length - 1];
       if (ended.type === "MatchEnded") {
         expect(ended.reason).toBe("completed");
       }
     });
 
-    it("events have monotonically increasing seq numbers", () => {
-      const result = runMatch(makeScenario(), makeAgents(), { seed: 77, maxTurns: 10 });
+    it("events have monotonically increasing seq numbers", async () => {
+      const result = await runMatch(makeScenario(), makeAgents(), { seed: 77, maxTurns: 10 });
       for (let i = 0; i < result.events.length; i++) {
         expect(result.events[i].seq).toBe(i);
       }
     });
 
-    it("all events share the same matchId", () => {
-      const result = runMatch(makeScenario(), makeAgents(), { seed: 55, maxTurns: 10 });
+    it("all events share the same matchId", async () => {
+      const result = await runMatch(makeScenario(), makeAgents(), { seed: 55, maxTurns: 10 });
       const { matchId } = result;
       for (const event of result.events) {
         expect(event.matchId).toBe(matchId);
@@ -86,8 +86,8 @@ describe("Contract v0 — Match Runner", () => {
   });
 
   describe("provenance", () => {
-    it("omits provenance fields when not provided", () => {
-      const result = runMatch(makeScenario(), makeAgents(), { seed: 42, maxTurns: 10 });
+    it("omits provenance fields when not provided", async () => {
+      const result = await runMatch(makeScenario(), makeAgents(), { seed: 42, maxTurns: 10 });
       const started = result.events[0];
       if (started.type === "MatchStarted") {
         expect("engineCommit" in started).toBe(false);
@@ -95,8 +95,8 @@ describe("Contract v0 — Match Runner", () => {
       }
     });
 
-    it("includes provenance fields when provided", () => {
-      const result = runMatch(makeScenario(), makeAgents(), {
+    it("includes provenance fields when provided", async () => {
+      const result = await runMatch(makeScenario(), makeAgents(), {
         seed: 42,
         maxTurns: 10,
         provenance: { engineCommit: "abc123", engineVersion: "1.2.3" },
@@ -110,8 +110,8 @@ describe("Contract v0 — Match Runner", () => {
   });
 
   describe("secrets policy", () => {
-    it("StateUpdated summaries do not contain secretNumber", () => {
-      const result = runMatch(makeScenario(), makeAgents(), { seed: 42, maxTurns: 20 });
+    it("StateUpdated summaries do not contain secretNumber", async () => {
+      const result = await runMatch(makeScenario(), makeAgents(), { seed: 42, maxTurns: 20 });
       const stateEvents = result.events.filter((e) => e.type === "StateUpdated");
       expect(stateEvents.length).toBeGreaterThan(0);
       for (const e of stateEvents) {
@@ -122,8 +122,8 @@ describe("Contract v0 — Match Runner", () => {
       }
     });
 
-    it("MatchEnded is emitted exactly once and includes details._private.secretNumber", () => {
-      const result = runMatch(makeScenario(), makeAgents(), { seed: 42, maxTurns: 20 });
+    it("MatchEnded is emitted exactly once and includes details._private.secretNumber", async () => {
+      const result = await runMatch(makeScenario(), makeAgents(), { seed: 42, maxTurns: 20 });
       const endedEvents = result.events.filter((e) => e.type === "MatchEnded");
       expect(endedEvents.length).toBe(1);
       const ended = endedEvents[0];
@@ -139,8 +139,8 @@ describe("Contract v0 — Match Runner", () => {
   });
 
   describe("serialization", () => {
-    it("every event is JSON-serializable and round-trips cleanly", () => {
-      const result = runMatch(makeScenario(), makeAgents(), { seed: 42, maxTurns: 20 });
+    it("every event is JSON-serializable and round-trips cleanly", async () => {
+      const result = await runMatch(makeScenario(), makeAgents(), { seed: 42, maxTurns: 20 });
       for (const event of result.events) {
         const json = JSON.stringify(event);
         expect(typeof json).toBe("string");
@@ -149,8 +149,8 @@ describe("Contract v0 — Match Runner", () => {
       }
     });
 
-    it("no event contains undefined or function values", () => {
-      const result = runMatch(makeScenario(), makeAgents(), { seed: 42, maxTurns: 20 });
+    it("no event contains undefined or function values", async () => {
+      const result = await runMatch(makeScenario(), makeAgents(), { seed: 42, maxTurns: 20 });
       for (const event of result.events) {
         const json = JSON.stringify(event);
         const parsed = JSON.parse(json) as Record<string, unknown>;
