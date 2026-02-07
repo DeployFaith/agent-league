@@ -56,6 +56,18 @@ const unknownEvent: ReplayEvent = makeEvent({
   raw: { foo: "bar" },
 });
 
+const nonObservationWithPrivatePrefix: ReplayEvent = makeEvent({
+  type: "ActionSubmitted",
+  seq: 100,
+  turn: 3,
+  agentId: "alice",
+  raw: {
+    action: { bid: 3 },
+    _privateDebug: { internalState: "x" },
+    nested: { _privateNote: "secret" },
+  },
+});
+
 // _private convention fixtures
 const observationWithPrivate: ReplayEvent = makeEvent({
   type: "ObservationEmitted",
@@ -204,6 +216,13 @@ describe("stripPrivateFields", () => {
     expect(result).toEqual({ a: 1, b: 3 });
   });
 
+  it("strips _private-prefixed keys", () => {
+    const input = { a: 1, _privateFoo: { secret: 2 }, b: 3 };
+    const { result, stripped } = stripPrivateFields(input);
+    expect(stripped).toBe(true);
+    expect(result).toEqual({ a: 1, b: 3 });
+  });
+
   it("strips _private in nested objects", () => {
     const input = { outer: { inner: "ok", _private: { hidden: true } } };
     const { result, stripped } = stripPrivateFields(input);
@@ -293,34 +312,62 @@ describe("_private field-level redaction", () => {
   describe("spectator mode with spoilers revealed", () => {
     const opts = { mode: "spectator" as const, revealSpoilers: true };
 
-    it("shows full observation including _private fields", () => {
+    it("still strips _private fields but keeps fullRaw", () => {
       const result = redactEvent(observationWithPrivate, opts);
-      expect(result.isRedacted).toBe(false);
+      expect(result.isRedacted).toBe(true);
       const obs = result.displayRaw.observation as Record<string, unknown>;
-      expect(obs._private).toEqual({ remainingResources: 73 });
+      expect(obs._private).toBeUndefined();
+      expect(result.fullRaw).not.toBeNull();
+      expect((result.fullRaw?.observation as Record<string, unknown>)._private).toEqual({
+        remainingResources: 73,
+      });
     });
   });
 
   describe("director mode", () => {
     const opts = { mode: "director" as const, revealSpoilers: false };
 
-    it("does not strip _private fields", () => {
+    it("strips _private fields from displayRaw but keeps fullRaw", () => {
       const result = redactEvent(observationWithPrivate, opts);
-      expect(result.isRedacted).toBe(false);
+      expect(result.isRedacted).toBe(true);
       const obs = result.displayRaw.observation as Record<string, unknown>;
-      expect(obs._private).toEqual({ remainingResources: 73 });
+      expect(obs._private).toBeUndefined();
+      expect(result.fullRaw).not.toBeNull();
+      expect((result.fullRaw?.observation as Record<string, unknown>)._private).toEqual({
+        remainingResources: 73,
+      });
     });
   });
 
   describe("postMatch mode", () => {
     const opts = { mode: "postMatch" as const, revealSpoilers: false };
 
-    it("does not strip _private (observations visible in postMatch)", () => {
+    it("strips _private from displayRaw even in postMatch", () => {
       const result = redactEvent(observationWithPrivate, opts);
-      expect(result.isRedacted).toBe(false);
+      expect(result.isRedacted).toBe(true);
       const obs = result.displayRaw.observation as Record<string, unknown>;
-      expect(obs._private).toEqual({ remainingResources: 73 });
+      expect(obs._private).toBeUndefined();
+      expect(result.fullRaw).toBeNull();
     });
+  });
+});
+
+describe("non-observation redaction", () => {
+  it("strips _private-prefixed keys from non-observation events", () => {
+    const spectator = redactEvent(nonObservationWithPrivatePrefix);
+    expect(spectator.isRedacted).toBe(true);
+    expect(spectator.displayRaw._privateDebug).toBeUndefined();
+    const nested = spectator.displayRaw.nested as Record<string, unknown>;
+    expect(nested._privateNote).toBeUndefined();
+
+    const postMatch = redactEvent(nonObservationWithPrivatePrefix, {
+      mode: "postMatch",
+      revealSpoilers: false,
+    });
+    expect(postMatch.isRedacted).toBe(true);
+    expect(postMatch.displayRaw._privateDebug).toBeUndefined();
+    const postNested = postMatch.displayRaw.nested as Record<string, unknown>;
+    expect(postNested._privateNote).toBeUndefined();
   });
 });
 
