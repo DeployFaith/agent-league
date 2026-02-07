@@ -38,3 +38,6 @@ Documents/Agentic_Design_Patterns.pdf
 
 # Local doc backups
 /Documents/.old/
+
+# local gateway diagnostics
+gateway_transcript.jsonl
