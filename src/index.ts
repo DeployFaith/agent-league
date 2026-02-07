@@ -29,3 +29,12 @@ export {
   validateHeistScenarioParams,
   assertHeistScenarioParams,
 } from "./games/heist/types.js";
+
+export type {
+  HeistDifficultyPreset,
+  HeistGeneratorConfig,
+  HeistGeneratorSecurityDensity,
+  HeistRoomCountConfig,
+} from "./games/heist/generatorTypes.js";
+
+export { generateHeistScenario } from "./games/heist/generator.js";
