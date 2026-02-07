@@ -145,6 +145,56 @@ function tryParseJson(text: string): Record<string, unknown> | null {
   return null;
 }
 
+function extractFirstJsonObject(text: string, startIndex: number): string | null {
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = startIndex; i < text.length; i++) {
+    const ch = text[i];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (ch === "\\" && inString) {
+      escape = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) {
+      continue;
+    }
+    if (ch === "{") {
+      depth++;
+    } else if (ch === "}") {
+      depth--;
+      if (depth === 0) {
+        return text.slice(startIndex, i + 1);
+      }
+    }
+  }
+  return null;
+}
+
+function unwrapAndNormalize(obj: Record<string, unknown>): HeistAction | null {
+  const direct = normalizeAction(obj);
+  if (direct) {
+    return direct;
+  }
+  for (const key of ["action", "response", "result"]) {
+    const inner = obj[key];
+    if (inner && typeof inner === "object" && !Array.isArray(inner)) {
+      const result = normalizeAction(inner as Record<string, unknown>);
+      if (result) {
+        return result;
+      }
+    }
+  }
+  return null;
+}
+
 function normalizeAction(candidate: Record<string, unknown>): HeistAction | null {
   const type = candidate.type;
   if (typeof type !== "string") {
@@ -182,24 +232,43 @@ function normalizeAction(candidate: Record<string, unknown>): HeistAction | null
 }
 
 export function parseResponse(text: string): HeistAction | null {
-  const direct = tryParseJson(text);
-  if (direct) {
-    return normalizeAction(direct);
+  if (!text || typeof text !== "string") {
+    return null;
   }
 
+  // Strategy 1: Direct parse
+  const direct = tryParseJson(text.trim());
+  if (direct) {
+    const result = unwrapAndNormalize(direct);
+    if (result) {
+      return result;
+    }
+  }
+
+  // Strategy 2: Markdown fence extraction
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
   if (fenced && fenced[1]) {
     const parsed = tryParseJson(fenced[1].trim());
     if (parsed) {
-      return normalizeAction(parsed);
+      const result = unwrapAndNormalize(parsed);
+      if (result) {
+        return result;
+      }
     }
   }
 
-  const firstObject = text.match(/{[\s\S]*?}/);
-  if (firstObject) {
-    const parsed = tryParseJson(firstObject[0]);
-    if (parsed) {
-      return normalizeAction(parsed);
+  // Strategy 3: Brace-matching extraction
+  const braceIndex = text.indexOf("{");
+  if (braceIndex !== -1) {
+    const extracted = extractFirstJsonObject(text, braceIndex);
+    if (extracted) {
+      const parsed = tryParseJson(extracted);
+      if (parsed) {
+        const result = unwrapAndNormalize(parsed);
+        if (result) {
+          return result;
+        }
+      }
     }
   }
 
