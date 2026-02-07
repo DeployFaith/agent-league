@@ -126,7 +126,7 @@ Hashes follow strict byte-level rules for cross-platform consistency.
 
 ---
 
-### ðŸ› Roles & Ecosystem
+### 🛠 Roles & Ecosystem
 | Role          | Responsibility                         |
 |---------------|------------------------------------------|
 | Builder       | Build agents, compete in tournaments     |
