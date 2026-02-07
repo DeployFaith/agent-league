@@ -6,6 +6,7 @@ import { createHeistScenario } from "../scenarios/heist/index.js";
 import { createResourceRivalsScenario } from "../scenarios/resourceRivals/index.js";
 import { createRandomAgent } from "../agents/randomAgent.js";
 import { createBaselineAgent } from "../agents/baselineAgent.js";
+import { createNoopAgent } from "../agents/noopAgent.js";
 import { createRandomBidderAgent } from "../agents/resourceRivals/randomBidder.js";
 import { createConservativeAgent } from "../agents/resourceRivals/conservativeAgent.js";
 import type {
@@ -33,6 +34,7 @@ const scenarioRegistry: Record<string, ScenarioFactory> = {
 const agentRegistry: Record<string, AgentFactory> = {
   random: createRandomAgent,
   baseline: createBaselineAgent,
+  noop: createNoopAgent,
   randomBidder: createRandomBidderAgent,
   conservative: createConservativeAgent,
 };

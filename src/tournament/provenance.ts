@@ -16,6 +16,7 @@ const SCENARIO_PATHS: Record<string, string> = {
 const AGENT_PATHS: Record<string, string> = {
   random: "agents/randomAgent",
   baseline: "agents/baselineAgent",
+  noop: "agents/noopAgent",
   randomBidder: "agents/resourceRivals/randomBidder",
   conservative: "agents/resourceRivals/conservativeAgent",
 };
