@@ -65,7 +65,8 @@ cd "$repo_root"
 echo "Building project..."
 npm run build
 
-tmp_jsonl="$(mktemp /tmp/hashmatch_match_XXXXXX.jsonl)"
+output_dir="$(mktemp -d /tmp/match-start-XXXXXX)"
+tmp_jsonl="$output_dir/match.jsonl"
 
 echo "Running match: scenario=$scenario seed=$seed turns=$turns agentA=$agentA agentB=$agentB"
 node dist/cli/run-match.js \
@@ -80,3 +81,8 @@ echo "Replaying recap..."
 node dist/cli/replay-match.js --in "$tmp_jsonl"
 
 echo "saved: $tmp_jsonl"
+echo "OUTPUT_JSONL=$tmp_jsonl"
+echo "OUTPUT_DIR=$output_dir"
+if [[ -f "$output_dir/gateway_transcript.jsonl" ]]; then
+  echo "OUTPUT_GATEWAY_TRANSCRIPT=$output_dir/gateway_transcript.jsonl"
+fi
