@@ -10,14 +10,14 @@ function makeAgents() {
 }
 
 describe("JSONL determinism", () => {
-  it("produces byte-identical JSONL for identical match inputs", () => {
+  it("produces byte-identical JSONL for identical match inputs", async () => {
     const scenario = createNumberGuessScenario();
     const agents = makeAgents();
-    const result1 = runMatch(scenario, agents, { seed: 123, maxTurns: 20 });
+    const result1 = await runMatch(scenario, agents, { seed: 123, maxTurns: 20 });
 
     const scenario2 = createNumberGuessScenario();
     const agents2 = makeAgents();
-    const result2 = runMatch(scenario2, agents2, { seed: 123, maxTurns: 20 });
+    const result2 = await runMatch(scenario2, agents2, { seed: 123, maxTurns: 20 });
 
     const jsonl1 = toStableJsonl(result1.events);
     const jsonl2 = toStableJsonl(result2.events);

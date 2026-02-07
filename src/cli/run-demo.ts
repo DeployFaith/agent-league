@@ -82,7 +82,7 @@ function tryReadEngineVersion(): string | undefined {
   }
 }
 
-function main(): void {
+async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
 
   if (args.scenario !== "numberGuess") {
@@ -106,7 +106,7 @@ function main(): void {
     }
   }
 
-  const result = runMatch(scenario, agents, {
+  const result = await runMatch(scenario, agents, {
     seed: args.seed,
     maxTurns: args.turns,
     ...(provenance ? { provenance } : {}),
@@ -124,4 +124,4 @@ function main(): void {
   console.log(`Wrote ${result.events.length} events to ${outPath}`);
 }
 
-main();
+void main();

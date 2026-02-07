@@ -179,7 +179,7 @@ describe("Broadcast manifest (tournament artifacts)", () => {
 
     try {
       const config = makeTournamentConfig({ seed: 24 });
-      const result = runTournament(config);
+      const result = await runTournament(config);
       await writeTournamentArtifacts(result, dir);
 
       const manifestRaw = readFileSync(join(dir, "broadcast_manifest.json"), "utf-8");

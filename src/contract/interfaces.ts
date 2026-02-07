@@ -22,7 +22,7 @@ export interface AgentContext {
 export interface Agent<TObs = JsonValue, TAct = JsonValue> {
   readonly id: AgentId;
   init(config: AgentConfig): void;
-  act(observation: TObs, ctx: AgentContext): TAct;
+  act(observation: TObs, ctx: AgentContext): TAct | Promise<TAct>;
 }
 
 // ---------------------------------------------------------------------------

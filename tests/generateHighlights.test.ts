@@ -134,7 +134,7 @@ describe("generateHighlights", () => {
     const dir = mkdtempSync(join(tmpdir(), "hashmatch-highlights-"));
 
     try {
-      const result = runTournament(makeConfig());
+      const result = await runTournament(makeConfig());
       await writeTournamentArtifacts(result, dir);
 
       for (const summary of result.matchSummaries) {

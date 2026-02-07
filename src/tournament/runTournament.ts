@@ -1,5 +1,5 @@
 import type { Agent, Scenario } from "../contract/interfaces.js";
-import type { AgentId, MatchEvent, Seed } from "../contract/types.js";
+import type { AgentId, JsonValue, MatchEvent, Seed } from "../contract/types.js";
 import { runMatch } from "../engine/runMatch.js";
 import { createNumberGuessScenario } from "../scenarios/numberGuess/index.js";
 import { createHeistScenario } from "../scenarios/heist/index.js";
@@ -9,6 +9,7 @@ import { createBaselineAgent } from "../agents/baselineAgent.js";
 import { createNoopAgent } from "../agents/noopAgent.js";
 import { createRandomBidderAgent } from "../agents/resourceRivals/randomBidder.js";
 import { createConservativeAgent } from "../agents/resourceRivals/conservativeAgent.js";
+import { buildOllamaHeistMetadata, createOllamaHeistAgent } from "../agents/ollama/index.js";
 import type {
   MatchKey,
   MatchSpec,
@@ -25,18 +26,31 @@ import type {
 type ScenarioFactory = () => Scenario<any, any, any>;
 type AgentFactory = (id: AgentId) => Agent<any, any>;
 
+export interface AgentProvenanceDescriptor {
+  metadata?: Record<string, JsonValue>;
+}
+
+interface AgentRegistration {
+  factory: AgentFactory;
+  provenance?: AgentProvenanceDescriptor | (() => AgentProvenanceDescriptor);
+}
+
 const scenarioRegistry: Record<string, ScenarioFactory> = {
   heist: createHeistScenario,
   numberGuess: createNumberGuessScenario,
   resourceRivals: createResourceRivalsScenario,
 };
 
-const agentRegistry: Record<string, AgentFactory> = {
-  random: createRandomAgent,
-  baseline: createBaselineAgent,
-  noop: createNoopAgent,
-  randomBidder: createRandomBidderAgent,
-  conservative: createConservativeAgent,
+const agentRegistry: Record<string, AgentRegistration> = {
+  random: { factory: createRandomAgent },
+  baseline: { factory: createBaselineAgent },
+  noop: { factory: createNoopAgent },
+  randomBidder: { factory: createRandomBidderAgent },
+  conservative: { factory: createConservativeAgent },
+  "ollama-heist": {
+    factory: createOllamaHeistAgent,
+    provenance: () => ({ metadata: buildOllamaHeistMetadata() }),
+  },
 };
 
 /** Resolve a scenario factory by key. Throws if unknown. */
@@ -51,12 +65,24 @@ export function getScenarioFactory(key: string): ScenarioFactory {
 
 /** Resolve an agent factory by key. Throws if unknown. */
 export function getAgentFactory(key: string): AgentFactory {
-  const factory = agentRegistry[key];
-  if (!factory) {
+  const registration = agentRegistry[key];
+  if (!registration) {
     const available = Object.keys(agentRegistry).join(", ");
     throw new Error(`Unknown agent "${key}". Available: ${available}`);
   }
-  return factory;
+  return registration.factory;
+}
+
+export function getAgentProvenanceDescriptor(
+  key: string,
+): AgentProvenanceDescriptor | undefined {
+  const registration = agentRegistry[key];
+  if (!registration?.provenance) {
+    return undefined;
+  }
+  return typeof registration.provenance === "function"
+    ? registration.provenance()
+    : registration.provenance;
 }
 
 // ---------------------------------------------------------------------------
@@ -96,7 +122,7 @@ export function deriveMatchSeed(tournamentSeed: Seed, matchKey: MatchKey): Seed 
  *
  * Deterministic: given the same config, produces identical results.
  */
-export function runTournament(config: TournamentConfig): TournamentResult {
+export async function runTournament(config: TournamentConfig): Promise<TournamentResult> {
   const {
     seed,
     maxTurns,
@@ -141,7 +167,7 @@ export function runTournament(config: TournamentConfig): TournamentResult {
         const swap = (round + i + j) % 2 === 1;
         const orderedAgents = swap ? [agentB, agentA] : [agentA, agentB];
 
-        const result = runMatch(scenario, orderedAgents, {
+        const result = await runMatch(scenario, orderedAgents, {
           seed: matchSeed,
           maxTurns,
         });

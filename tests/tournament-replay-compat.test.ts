@@ -25,7 +25,7 @@ describe("Tournament replay artifact compatibility", () => {
     const outDir = mkdtempSync(join(tmpdir(), "hashmatch-replay-compat-"));
 
     try {
-      const result = runTournament(config);
+      const result = await runTournament(config);
       await writeTournamentArtifacts(result, outDir);
 
       const tournamentPath = join(outDir, "tournament.json");

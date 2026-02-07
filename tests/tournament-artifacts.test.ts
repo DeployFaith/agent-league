@@ -42,8 +42,8 @@ describe("Tournament artifacts determinism", () => {
     const dirB = mkdtempSync(join(tmpdir(), "hashmatch-b-"));
 
     try {
-      const resultA = runTournament(config);
-      const resultB = runTournament(config);
+      const resultA = await runTournament(config);
+      const resultB = await runTournament(config);
 
       await writeTournamentArtifacts(resultA, dirA);
       await writeTournamentArtifacts(resultB, dirB);
@@ -83,7 +83,7 @@ describe("Tournament artifacts manifest", () => {
     const dir = mkdtempSync(join(tmpdir(), "hashmatch-tournament-manifest-"));
 
     try {
-      const result = runTournament(config);
+      const result = await runTournament(config);
       await writeTournamentArtifacts(result, dir);
 
       const manifestRaw = readFileSync(join(dir, "tournament_manifest.json"), "utf-8");
@@ -116,7 +116,7 @@ describe("Tournament artifacts manifest", () => {
     const dir = mkdtempSync(join(tmpdir(), "hashmatch-manifest-"));
 
     try {
-      const result = runTournament(config);
+      const result = await runTournament(config);
       await writeTournamentArtifacts(result, dir);
 
       const matchDir = join(dir, "matches", result.matchSummaries[0].matchKey);
@@ -173,7 +173,7 @@ describe("Tournament artifact hashing", () => {
     const dir = mkdtempSync(join(tmpdir(), "hashmatch-hashes-"));
 
     try {
-      const result = runTournament(config);
+      const result = await runTournament(config);
       await writeTournamentArtifacts(result, dir);
 
       const matchDir = join(dir, "matches", result.matchSummaries[0].matchKey);
@@ -202,8 +202,8 @@ describe("Tournament artifact hashing", () => {
     const dirB = mkdtempSync(join(tmpdir(), "hashmatch-hashes-b-"));
 
     try {
-      const resultA = runTournament(config);
-      const resultB = runTournament(config);
+      const resultA = await runTournament(config);
+      const resultB = await runTournament(config);
       await writeTournamentArtifacts(resultA, dirA);
       await writeTournamentArtifacts(resultB, dirB);
 

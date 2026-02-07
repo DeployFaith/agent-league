@@ -38,11 +38,11 @@ function createInvalidMoveAgent(id: AgentId): Agent<HeistObservation, HeistActio
 }
 
 describe("Heist competitive runner", () => {
-  it("combines two solo attempts into a single match stream", () => {
+  it("combines two solo attempts into a single match stream", async () => {
     const agentA = createWaitAgent("heist-a");
     const agentB = createWaitAgent("heist-b");
 
-    const result = runMatch(createHeistScenario(), [agentA, agentB], { seed: 101, maxTurns: 5 });
+    const result = await runMatch(createHeistScenario(), [agentA, agentB], { seed: 101, maxTurns: 5 });
 
     const started = result.events[0];
     expect(started.type).toBe("MatchStarted");
@@ -77,11 +77,11 @@ describe("Heist competitive runner", () => {
     }
   });
 
-  it("produces deterministic winner comparisons from solo scores", () => {
+  it("produces deterministic winner comparisons from solo scores", async () => {
     const agentA = createWaitAgent("heist-a");
     const agentB = createInvalidMoveAgent("heist-b");
 
-    const result = runMatch(createHeistScenario(), [agentA, agentB], { seed: 202, maxTurns: 5 });
+    const result = await runMatch(createHeistScenario(), [agentA, agentB], { seed: 202, maxTurns: 5 });
 
     const scoreA = result.scores[agentA.id];
     const scoreB = result.scores[agentB.id];

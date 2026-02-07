@@ -23,7 +23,7 @@ const config: TournamentConfig = {
   includeEventLogs: true,
 };
 
-const result = runTournament(config);
+const result = await runTournament(config);
 await writeTournamentArtifacts(result, outDir);
 
 // eslint-disable-next-line no-console -- fixture generator emits useful status

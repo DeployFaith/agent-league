@@ -68,7 +68,7 @@ async function runMatchAndPersist(
     const agentFactories = request.agentKeys.map((key) => getAgentFactory(key));
     const agents = agentFactories.map((factory, index) => factory(`${request.agentKeys[index]}-${index}`));
 
-    const result = runMatch(scenario, agents, {
+    const result = await runMatch(scenario, agents, {
       seed,
       maxTurns,
       matchId,

@@ -1,0 +1,261 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import * as ollamaClient from "../src/agents/ollama/ollamaClient.js";
+import { createOllamaAgent } from "../src/agents/ollama/createOllamaAgent.js";
+import { createOllamaHeistAgent } from "../src/agents/ollama/index.js";
+import { heistAdapter, parseResponse } from "../src/agents/ollama/heistAdapter.js";
+import { runMatch } from "../src/engine/runMatch.js";
+import { createHeistScenario } from "../src/scenarios/heist/index.js";
+import { toStableJsonl } from "../src/core/json.js";
+import type { OllamaChatMessage, OllamaConfig } from "../src/agents/ollama/ollamaClient.js";
+
+const originalAllowTools = process.env.HASHMATCH_ALLOW_TOOLS;
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+  if (originalAllowTools === undefined) {
+    delete process.env.HASHMATCH_ALLOW_TOOLS;
+  } else {
+    process.env.HASHMATCH_ALLOW_TOOLS = originalAllowTools;
+  }
+});
+
+describe("ollamaChat", () => {
+  it("sends requests without options when none are provided", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ message: { content: "ok" } }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const config: OllamaConfig = { model: "test-model" };
+    const messages: OllamaChatMessage[] = [{ role: "user", content: "hi" }];
+    const result = await ollamaClient.ollamaChat(config, messages);
+
+    expect(result).toBe("ok");
+    const calls = fetchMock.mock.calls as unknown as Array<[unknown, RequestInit | undefined]>;
+    const call = calls[0];
+    if (!call) {
+      throw new Error("Expected fetch to be called");
+    }
+    const request = call[1];
+    if (!request?.body) {
+      throw new Error("Expected request body to be set");
+    }
+    const body = JSON.parse(request.body as string) as Record<string, unknown>;
+    expect(body.options).toBeUndefined();
+  });
+
+  it("includes options when provided", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ message: { content: "ok" } }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const config: OllamaConfig = { model: "test-model", options: { temperature: 0.5 } };
+    await ollamaClient.ollamaChat(config, []);
+
+    const calls = fetchMock.mock.calls as unknown as Array<[unknown, RequestInit | undefined]>;
+    const call = calls[0];
+    if (!call) {
+      throw new Error("Expected fetch to be called");
+    }
+    const request = call[1];
+    if (!request?.body) {
+      throw new Error("Expected request body to be set");
+    }
+    const body = JSON.parse(request.body as string) as Record<string, unknown>;
+    expect(body.options).toEqual({ temperature: 0.5 });
+  });
+
+  it("returns status errors for non-200 responses", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: false,
+      status: 500,
+      json: async () => ({}),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await ollamaClient.ollamaChat({ model: "test-model" }, []);
+    expect(result).toBe("ERROR: Ollama returned status 500");
+  });
+
+  it("returns unreachable error on network failures", async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new Error("network down");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await ollamaClient.ollamaChat({ model: "test-model" }, []);
+    expect(result).toBe("ERROR: Ollama unreachable");
+  });
+
+  it("returns unreachable error on timeout", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn(
+      () =>
+        new Promise(() => {
+          // never resolves
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const promise = ollamaClient.ollamaChat({ model: "test-model", timeoutMs: 10 }, []);
+    await vi.advanceTimersByTimeAsync(20);
+    await expect(promise).resolves.toBe("ERROR: Ollama unreachable");
+  });
+});
+
+describe("heistAdapter.parseResponse", () => {
+  it("parses valid JSON", () => {
+    const parsed = parseResponse('{"type":"wait"}');
+    expect(parsed).toEqual({ type: "wait" });
+  });
+
+  it("parses JSON inside markdown fences", () => {
+    const parsed = parseResponse("```json\n{\"type\":\"extract\"}\n```");
+    expect(parsed).toEqual({ type: "extract" });
+  });
+
+  it("parses JSON inside prose", () => {
+    const parsed = parseResponse("Here you go: {\"type\":\"move\",\"toRoomId\":\"room-2\"}");
+    expect(parsed).toEqual({ type: "move", toRoomId: "room-2" });
+  });
+
+  it("returns null for garbage input", () => {
+    const parsed = parseResponse("no json here");
+    expect(parsed).toBeNull();
+  });
+
+  it("uses a legal fallback action", () => {
+    expect(heistAdapter.fallbackAction).toEqual({ type: "wait" });
+  });
+});
+
+describe("createOllamaAgent", () => {
+  beforeEach(() => {
+    process.env.HASHMATCH_ALLOW_TOOLS = "true";
+  });
+
+  it("runs the full pipeline and returns parsed actions", async () => {
+    const ollamaChatSpy = vi
+      .spyOn(ollamaClient, "ollamaChat")
+      .mockResolvedValue('{"type":"wait"}');
+
+    const adapter = {
+      systemPrompt: "system",
+      formatObservation: vi.fn(() => "formatted obs"),
+      parseResponse: vi.fn(() => ({ type: "wait" })),
+      fallbackAction: { type: "wait" },
+    };
+
+    const agent = createOllamaAgent("ollama-1", { model: "test" }, adapter);
+    agent.init({ agentId: "ollama-1", seed: 1 });
+    const action = await agent.act({ turn: 1 }, { agentId: "ollama-1", turn: 1, rng: () => 0.5 });
+
+    expect(adapter.formatObservation).toHaveBeenCalled();
+    expect(ollamaChatSpy).toHaveBeenCalled();
+    expect(adapter.parseResponse).toHaveBeenCalled();
+    expect(action).toEqual({ type: "wait" });
+  });
+
+  it("falls back when response parsing fails", async () => {
+    vi.spyOn(ollamaClient, "ollamaChat").mockResolvedValue("garbage");
+
+    const adapter = {
+      systemPrompt: "system",
+      formatObservation: vi.fn(() => "formatted obs"),
+      parseResponse: vi.fn(() => null),
+      fallbackAction: { type: "wait" },
+    };
+
+    const agent = createOllamaAgent("ollama-2", { model: "test" }, adapter);
+    agent.init({ agentId: "ollama-2", seed: 2 });
+    const action = await agent.act({ turn: 1 }, { agentId: "ollama-2", turn: 1, rng: () => 0.5 });
+
+    expect(action).toEqual({ type: "wait" });
+  });
+
+  it("rejects non-finite numeric values", async () => {
+    vi.spyOn(ollamaClient, "ollamaChat").mockResolvedValue('{"type":"wait"}');
+
+    const adapter = {
+      systemPrompt: "system",
+      formatObservation: vi.fn(() => "formatted obs"),
+      parseResponse: vi.fn(() => ({ type: "move", toRoomId: "room-1", cost: Infinity })),
+      fallbackAction: { type: "wait" },
+    };
+
+    const agent = createOllamaAgent("ollama-3", { model: "test" }, adapter);
+    agent.init({ agentId: "ollama-3", seed: 3 });
+    const action = await agent.act({ turn: 1 }, { agentId: "ollama-3", turn: 1, rng: () => 0.5 });
+
+    expect(action).toEqual({ type: "wait" });
+  });
+
+  it("warns once when Ollama is unreachable", async () => {
+    vi.spyOn(ollamaClient, "ollamaChat").mockResolvedValue("ERROR: Ollama unreachable");
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const adapter = {
+      systemPrompt: "system",
+      formatObservation: vi.fn(() => "formatted obs"),
+      parseResponse: vi.fn(() => null),
+      fallbackAction: { type: "wait" },
+    };
+
+    const agent = createOllamaAgent("ollama-4", { model: "test" }, adapter);
+    agent.init({ agentId: "ollama-4", seed: 4 });
+    await agent.act({ turn: 1 }, { agentId: "ollama-4", turn: 1, rng: () => 0.5 });
+    await agent.act({ turn: 2 }, { agentId: "ollama-4", turn: 2, rng: () => 0.5 });
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+async function isOllamaAvailable(): Promise<boolean> {
+  try {
+    const response = await fetch("http://localhost:11434/api/tags");
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+const ollamaAvailable = await isOllamaAvailable();
+
+describe.skipIf(!ollamaAvailable)("ollama-heist integration", () => {
+  it("runs a heist match and writes match.jsonl to a temp directory", async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), "hashmatch-ollama-"));
+    const originalAllow = process.env.HASHMATCH_ALLOW_TOOLS;
+    process.env.HASHMATCH_ALLOW_TOOLS = "true";
+
+    try {
+      const scenario = createHeistScenario();
+      const agents = [createOllamaHeistAgent("ollama-0"), createOllamaHeistAgent("ollama-1")];
+      const result = await runMatch(scenario, agents, { seed: 9, maxTurns: 5 });
+      const jsonl = toStableJsonl(result.events);
+      const outPath = join(tempDir, "match.jsonl");
+      await writeFile(outPath, jsonl, "utf-8");
+
+      const raw = await readFile(outPath, "utf-8");
+      const lines = raw.trim().split("\n");
+      expect(lines.length).toBeGreaterThan(0);
+      expect(() => JSON.parse(lines[0])).not.toThrow();
+    } finally {
+      if (originalAllow === undefined) {
+        delete process.env.HASHMATCH_ALLOW_TOOLS;
+      } else {
+        process.env.HASHMATCH_ALLOW_TOOLS = originalAllow;
+      }
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+});

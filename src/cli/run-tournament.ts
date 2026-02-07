@@ -129,7 +129,7 @@ async function main(): Promise<void> {
   // eslint-disable-next-line no-console
   console.log();
 
-  const result = runTournament(config);
+  const result = await runTournament(config);
 
   // eslint-disable-next-line no-console
   console.log(`Completed ${result.matchSummaries.length} matches.\n`);

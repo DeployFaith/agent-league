@@ -23,7 +23,7 @@ describe("Gateway runner integration", () => {
     const seed = 42;
     const turns = 5;
 
-    const baseline = runMatch(createNumberGuessScenario(), makeAgents(), {
+    const baseline = await runMatch(createNumberGuessScenario(), makeAgents(), {
       seed,
       maxTurns: turns,
     });
@@ -53,10 +53,10 @@ describe("Gateway runner integration", () => {
     }
   });
 
-  it("does not create transcript without gateway", () => {
+  it("does not create transcript without gateway", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "gateway-runner-no-"));
     try {
-      runMatch(createNumberGuessScenario(), makeAgents(), { seed: 7, maxTurns: 3 });
+      await runMatch(createNumberGuessScenario(), makeAgents(), { seed: 7, maxTurns: 3 });
       expect(existsSync(join(tempDir, GATEWAY_TRANSCRIPT_FILENAME))).toBe(false);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });

@@ -27,7 +27,7 @@ describe("Tournament bundle output", () => {
     const bundlePath = join(dir, "bundle.json");
 
     try {
-      const result = runTournament(makeConfig());
+      const result = await runTournament(makeConfig());
       await writeTournamentArtifacts(result, artifactsDir);
       await writeTournamentBundle(result, bundlePath);
 
