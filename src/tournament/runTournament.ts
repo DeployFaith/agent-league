@@ -2,6 +2,7 @@ import type { Agent, Scenario } from "../contract/interfaces.js";
 import type { AgentId, MatchEvent, Seed } from "../contract/types.js";
 import { runMatch } from "../engine/runMatch.js";
 import { createNumberGuessScenario } from "../scenarios/numberGuess/index.js";
+import { createHeistScenario } from "../scenarios/heist/index.js";
 import { createResourceRivalsScenario } from "../scenarios/resourceRivals/index.js";
 import { createRandomAgent } from "../agents/randomAgent.js";
 import { createBaselineAgent } from "../agents/baselineAgent.js";
@@ -24,6 +25,7 @@ type ScenarioFactory = () => Scenario<any, any, any>;
 type AgentFactory = (id: AgentId) => Agent<any, any>;
 
 const scenarioRegistry: Record<string, ScenarioFactory> = {
+  heist: createHeistScenario,
   numberGuess: createNumberGuessScenario,
   resourceRivals: createResourceRivalsScenario,
 };
