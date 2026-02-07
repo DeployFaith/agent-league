@@ -61,6 +61,13 @@ export function createOllamaAgent(
 
       const response = await ollamaChat(ollamaConfig, [systemMessage, userMessage]);
 
+      if (process.env.HASHMATCH_OLLAMA_DEBUG === "1") {
+        // eslint-disable-next-line no-console
+        console.error(
+          `[ollama-debug] raw response (${response.length} chars): ${response.slice(0, 500)}`,
+        );
+      }
+
       if (!warnedUnreachable && response.startsWith("ERROR: Ollama unreachable")) {
         warnedUnreachable = true;
         // eslint-disable-next-line no-console
@@ -68,6 +75,12 @@ export function createOllamaAgent(
       }
 
       const parsed = adapter.parseResponse(response);
+
+      if (process.env.HASHMATCH_OLLAMA_DEBUG === "1") {
+        // eslint-disable-next-line no-console
+        console.error(`[ollama-debug] parsed result: ${JSON.stringify(parsed)}`);
+      }
+
       const action = parsed ?? adapter.fallbackAction;
       if (!hasOnlyFiniteNumbers(action)) {
         return adapter.fallbackAction;

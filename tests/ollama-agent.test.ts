@@ -138,6 +138,70 @@ describe("heistAdapter.parseResponse", () => {
   it("uses a legal fallback action", () => {
     expect(heistAdapter.fallbackAction).toEqual({ type: "wait" });
   });
+
+  it("parses bare valid JSON with pickup action", () => {
+    const parsed = parseResponse('{"type":"pickup","itemId":"keycard-1"}');
+    expect(parsed).toEqual({ type: "pickup", itemId: "keycard-1" });
+  });
+
+  it("parses JSON with surrounding whitespace and newlines", () => {
+    const parsed = parseResponse('  \n{"type":"move","toRoomId":"room-2"}\n  ');
+    expect(parsed).toEqual({ type: "move", toRoomId: "room-2" });
+  });
+
+  it("parses markdown-fenced JSON with pickup action", () => {
+    const parsed = parseResponse('```json\n{"type":"pickup","itemId":"keycard-1"}\n```');
+    expect(parsed).toEqual({ type: "pickup", itemId: "keycard-1" });
+  });
+
+  it("parses prose-wrapped JSON with move action", () => {
+    const parsed = parseResponse(
+      'Sure! Here is my action: {"type":"move","toRoomId":"room-2"} I chose to move.',
+    );
+    expect(parsed).toEqual({ type: "move", toRoomId: "room-2" });
+  });
+
+  it("unwraps action key wrapper", () => {
+    const parsed = parseResponse('{"action":{"type":"pickup","itemId":"keycard-1"}}');
+    expect(parsed).toEqual({ type: "pickup", itemId: "keycard-1" });
+  });
+
+  it("returns null for garbage text with no JSON", () => {
+    const parsed = parseResponse("I am confused about what to do");
+    expect(parsed).toBeNull();
+  });
+
+  it("returns null for empty string", () => {
+    const parsed = parseResponse("");
+    expect(parsed).toBeNull();
+  });
+
+  it("returns null for invalid action type inside valid JSON", () => {
+    const parsed = parseResponse('{"type":"fly","destination":"moon"}');
+    expect(parsed).toBeNull();
+  });
+
+  it("unwraps response key wrapper", () => {
+    const parsed = parseResponse('{"response":{"type":"extract"}}');
+    expect(parsed).toEqual({ type: "extract" });
+  });
+
+  it("unwraps result key wrapper", () => {
+    const parsed = parseResponse('{"result":{"type":"wait"}}');
+    expect(parsed).toEqual({ type: "wait" });
+  });
+
+  it("parses nested JSON from prose using brace matching", () => {
+    const parsed = parseResponse(
+      'I will move now: {"action":{"type":"move","toRoomId":"room-3"}} end.',
+    );
+    expect(parsed).toEqual({ type: "move", toRoomId: "room-3" });
+  });
+
+  it("parses plain fences without json tag", () => {
+    const parsed = parseResponse('```\n{"type":"use_terminal","terminalId":"term-1"}\n```');
+    expect(parsed).toEqual({ type: "use_terminal", terminalId: "term-1" });
+  });
 });
 
 describe("createOllamaAgent", () => {
