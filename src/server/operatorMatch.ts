@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { stableStringify } from "../core/json.js";
 
@@ -35,7 +35,8 @@ export function formatMatchTimestamp(date: Date): string {
 
 export function buildOperatorMatchId(date: Date): string {
   const timestamp = formatMatchTimestamp(date);
-  return `match-${timestamp}-${randomUUID()}`;
+  const suffix = randomBytes(8).toString("hex");
+  return `match-${timestamp}-${suffix}`;
 }
 
 export function readOperatorMatchStatus(path: string): OperatorMatchStatus | null {

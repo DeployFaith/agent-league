@@ -8,7 +8,7 @@ import { buildOperatorMatchId } from "../src/server/operatorMatch.js";
 import type { MatchLifecycleStatusRecord } from "../src/server/matchLifecycle.js";
 
 vi.mock("node:crypto", () => ({
-  randomUUID: () => "d3b07384-d9a4-4f32-bd0e-1b6b1b2c4f5a",
+  randomBytes: () => Buffer.from("d3b07384d9a44f32", "hex"),
 }));
 
 let tempDir = "";
