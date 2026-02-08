@@ -15,10 +15,13 @@ export type PlaybackState = {
   pause: () => void;
   setSpeed: (s: number) => void;
   restart: () => void;
+  /** Seek to a specific event index. Pauses playback. */
+  seek: (index: number) => void;
   isFinished: boolean;
   scores: Record<string, number>;
   cursor: number;
   eventCount: number;
+  events: MatchEvent[];
 };
 
 const BASE_INTERVAL_MS = 1800;
@@ -135,6 +138,14 @@ export function useHeistPlayback(events: MatchEvent[]): PlaybackState {
     setPlaying(true);
   }, []);
 
+  const seek = useCallback(
+    (index: number) => {
+      setCursor(Math.max(0, Math.min(index, maxCursor)));
+      setPlaying(false);
+    },
+    [maxCursor],
+  );
+
   const setPlaybackSpeed = useCallback((s: number) => {
     setSpeed(s);
   }, []);
@@ -149,9 +160,11 @@ export function useHeistPlayback(events: MatchEvent[]): PlaybackState {
     pause,
     setSpeed: setPlaybackSpeed,
     restart,
+    seek,
     isFinished,
     scores: currentScores,
     cursor: clampedCursor,
     eventCount,
+    events,
   };
 }

@@ -18,6 +18,12 @@ export type HeistSceneState = {
   sceneFacts?: {
     alertLevel?: number;
   };
+  /** Scenario params needed by HUD selectors (win condition, extraction room, etc.). */
+  scenarioParams?: {
+    extractionRoomId?: string;
+    requiredObjectives?: string[];
+    maxAlertLevel?: number;
+  };
   lastEventSeq?: number;
   unknownEvents?: Array<{ type: string; seq?: number }>;
 };
@@ -75,4 +81,6 @@ export type ItemVisual = {
   roomId?: RoomId;
   label?: string;
   state?: Record<string, unknown>;
+  /** Agent who currently holds this item (set by pickup adjudication). */
+  heldBy?: AgentId;
 };

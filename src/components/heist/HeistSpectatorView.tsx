@@ -12,6 +12,8 @@ import { EventToast } from "./EventToast";
 import { ActionFeed } from "./ActionFeed";
 import { PlaybackControls } from "./PlaybackControls";
 import { MatchEndOverlay } from "./MatchEndOverlay";
+import { HeistHUDOverlay } from "./hud/HeistHUDOverlay";
+import { HeistMomentsPanel } from "./moments/HeistMomentsPanel";
 
 type LoadState =
   | { phase: "idle" }
@@ -186,6 +188,10 @@ function SpectatorPlayback({ events }: { events: MatchEvent[] }) {
             from { opacity: 0; }
             to { opacity: 1; }
           }
+          @keyframes alertPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+          }
         `}
       </style>
 
@@ -202,6 +208,16 @@ function SpectatorPlayback({ events }: { events: MatchEvent[] }) {
 
         {/* SVG Map */}
         <HeistMap state={playback.state} />
+
+        {/* HUD overlays — inventory, objectives, alert, terminals, doors */}
+        <HeistHUDOverlay state={playback.state} scores={playback.scores} />
+
+        {/* Moments panel */}
+        <HeistMomentsPanel
+          events={playback.events}
+          currentSeq={playback.state.lastEventSeq ?? 0}
+          onSeekToSeq={playback.seek}
+        />
 
         {/* Event toast */}
         <EventToast state={playback.state} cursor={playback.cursor} />
