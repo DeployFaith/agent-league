@@ -50,7 +50,6 @@ gateway_transcript.jsonl
 /dist-scripts/
 
 # local keys
-/keys/
 
 # Keys: ignore private material, allow committed public keys
 /keys/*

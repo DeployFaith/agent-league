@@ -1,0 +1,8 @@
+# Ignore all keys by default
+*
+
+# Allow committed public keys
+!*.pub.pem
+
+# Allow this .gitignore itself
+!.gitignore
