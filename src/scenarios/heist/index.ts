@@ -9,6 +9,11 @@ import type {
   HeistScenarioParams,
   HeistTerminalEntity,
 } from "../../games/heist/types.js";
+import {
+  HEIST_ERROR_CODES,
+  HEIST_RESULT_CODES,
+  type HeistErrorCode,
+} from "./feedbackCodes.js";
 
 // ---------------------------------------------------------------------------
 // State & observation types
@@ -270,15 +275,25 @@ export function createHeistScenario(
     ): AdjudicationResult<HeistState> {
       const agent = state.agents[agentId];
       if (!agent) {
-        return invalidAction(state, agentId, "Unknown agent.");
+        return invalidAction(state, agentId, HEIST_ERROR_CODES.unknown_agent, "Unknown agent.");
       }
 
       if (!isActionObject(action)) {
-        return invalidAction(state, agentId, "Invalid action payload.");
+        return invalidAction(
+          state,
+          agentId,
+          HEIST_ERROR_CODES.invalid_action_payload,
+          "Invalid action payload.",
+        );
       }
 
       if (agent.extracted && action.type !== "wait") {
-        return invalidAction(state, agentId, "Agent already extracted.");
+        return invalidAction(
+          state,
+          agentId,
+          HEIST_ERROR_CODES.agent_already_extracted,
+          "Agent already extracted.",
+        );
       }
 
       switch (action.type) {
@@ -286,7 +301,7 @@ export function createHeistScenario(
           return {
             valid: true,
             state: advanceTurn(state),
-            feedback: { ok: true },
+            feedback: { message: "Waited." },
           };
         case "move":
           return adjudicateMove(state, agentId, action.toRoomId);
@@ -297,7 +312,13 @@ export function createHeistScenario(
         case "extract":
           return adjudicateExtract(state, agentId);
         default:
-          return invalidAction(state, agentId, "Unknown action type.");
+          return invalidAction(
+            state,
+            agentId,
+            HEIST_ERROR_CODES.invalid_action_type,
+            "Unknown action type.",
+            { actionType: (action as HeistAction).type },
+          );
       }
     },
 
@@ -462,18 +483,48 @@ function adjudicateMove(
   toRoomId: string,
 ): AdjudicationResult<HeistState> {
   if (typeof toRoomId !== "string" || toRoomId.length === 0) {
-    return invalidAction(state, agentId, "Invalid move target.");
+    return invalidAction(
+      state,
+      agentId,
+      HEIST_ERROR_CODES.invalid_move_target,
+      "Invalid move target.",
+    );
   }
 
   const agent = state.agents[agentId];
   const door = findDoorBetween(state.params.map.doors, agent.roomId, toRoomId);
   if (!door) {
-    return invalidAction(state, agentId, "No door between rooms.");
+    return invalidAction(
+      state,
+      agentId,
+      HEIST_ERROR_CODES.no_door_between_rooms,
+      "No door connects those rooms.",
+      { fromRoomId: agent.roomId, toRoomId },
+    );
   }
 
   const inventory = new Set(agent.inventory);
   if (!isDoorPassable(door, inventory)) {
-    return invalidAction(state, agentId, "Door is locked.");
+    if (door.requiredItem && !inventory.has(door.requiredItem)) {
+      return invalidAction(
+        state,
+        agentId,
+        HEIST_ERROR_CODES.missing_required_item,
+        "Missing required item for this door.",
+        {
+          doorId: door.id,
+          requiredItem: door.requiredItem,
+          fromRoomId: agent.roomId,
+          toRoomId,
+        },
+      );
+    }
+
+    return invalidAction(state, agentId, HEIST_ERROR_CODES.door_locked, "Door is locked.", {
+      doorId: door.id,
+      fromRoomId: agent.roomId,
+      toRoomId,
+    });
   }
 
   const nextState = advanceTurn(state);
@@ -482,7 +533,12 @@ function adjudicateMove(
     state: updateAgent(nextState, agentId, {
       roomId: toRoomId,
     }),
-    feedback: { moved: true, toRoomId },
+    feedback: {
+      result: HEIST_RESULT_CODES.moved,
+      message: `Moved to ${toRoomId}.`,
+      toRoomId,
+      doorId: door.id,
+    },
   };
 }
 
@@ -492,18 +548,26 @@ function adjudicatePickup(
   itemId: string,
 ): AdjudicationResult<HeistState> {
   if (typeof itemId !== "string" || itemId.length === 0) {
-    return invalidAction(state, agentId, "Invalid item id.");
+    return invalidAction(state, agentId, HEIST_ERROR_CODES.invalid_item_id, "Invalid item id.");
   }
 
   const agent = state.agents[agentId];
   const location = state.itemLocations[itemId];
   if (location !== agent.roomId) {
-    return invalidAction(state, agentId, "Item not present in room.");
+    return invalidAction(
+      state,
+      agentId,
+      HEIST_ERROR_CODES.item_not_in_room,
+      "Item not present in this room.",
+      { itemId, currentRoomId: agent.roomId },
+    );
   }
 
   const item = state.params.items.find((candidate) => candidate.id === itemId);
   if (!item) {
-    return invalidAction(state, agentId, "Unknown item.");
+    return invalidAction(state, agentId, HEIST_ERROR_CODES.unknown_item, "Unknown item.", {
+      itemId,
+    });
   }
 
   const nextState = advanceTurn(state);
@@ -525,7 +589,12 @@ function adjudicatePickup(
         [itemId]: null,
       },
     },
-    feedback: { pickedUp: itemId },
+    feedback: {
+      result: HEIST_RESULT_CODES.item_pickup,
+      message: `Picked up ${itemId}.`,
+      itemId,
+      itemType: item.type,
+    },
   };
 }
 
@@ -535,7 +604,12 @@ function adjudicateTerminal(
   terminalId: string,
 ): AdjudicationResult<HeistState> {
   if (typeof terminalId !== "string" || terminalId.length === 0) {
-    return invalidAction(state, agentId, "Invalid terminal id.");
+    return invalidAction(
+      state,
+      agentId,
+      HEIST_ERROR_CODES.invalid_terminal_id,
+      "Invalid terminal id.",
+    );
   }
 
   const agent = state.agents[agentId];
@@ -545,21 +619,31 @@ function adjudicateTerminal(
   );
 
   if (!terminal || terminal.roomId !== agent.roomId) {
-    return invalidAction(state, agentId, "Terminal not available in this room.");
+    return invalidAction(
+      state,
+      agentId,
+      HEIST_ERROR_CODES.terminal_not_in_room,
+      "Terminal not available in this room.",
+      { terminalId, currentRoomId: agent.roomId },
+    );
   }
 
   const nextState = advanceTurn(state);
   const currentProgress = nextState.terminalProgress[terminalId] ?? 0;
   const nextProgress = currentProgress + 1;
   const terminalAlreadyHacked = nextState.terminalHacked[terminalId] ?? false;
+  const hackRequired = terminal.hackTurns;
 
   let updatedInventory = agent.inventory;
   let hacked = terminalAlreadyHacked;
+  const grantedItems: string[] = [];
+  const willHack = !terminalAlreadyHacked && nextProgress >= terminal.hackTurns;
 
-  if (!terminalAlreadyHacked && nextProgress >= terminal.hackTurns) {
+  if (willHack) {
     hacked = true;
     for (const grant of terminal.successGrants ?? []) {
       updatedInventory = addUnique(updatedInventory, grant);
+      grantedItems.push(grant);
     }
   }
 
@@ -576,33 +660,63 @@ function adjudicateTerminal(
         [terminalId]: hacked,
       },
     },
-    feedback: { terminalId, progress: nextProgress, hacked },
+    feedback: {
+      result: willHack ? HEIST_RESULT_CODES.hack_complete : HEIST_RESULT_CODES.hack_progress,
+      message: willHack
+        ? "Terminal hacked successfully."
+        : `Terminal hack progress ${nextProgress}/${hackRequired}.`,
+      terminalId,
+      progress: nextProgress,
+      hackRequired,
+      hacked,
+      ...(grantedItems.length > 0 ? { grantedItems } : {}),
+    },
   };
 }
 
 function adjudicateExtract(state: HeistState, agentId: AgentId): AdjudicationResult<HeistState> {
   const agent = state.agents[agentId];
   if (agent.roomId !== state.params.winCondition.extractionRoomId) {
-    return invalidAction(state, agentId, "Not in extraction room.");
+    return invalidAction(
+      state,
+      agentId,
+      HEIST_ERROR_CODES.not_in_extraction_room,
+      "Not in extraction room.",
+      {
+        currentRoomId: agent.roomId,
+        extractionRoomId: state.params.winCondition.extractionRoomId,
+      },
+    );
   }
 
   const nextState = advanceTurn(state);
   return {
     valid: true,
     state: updateAgent(nextState, agentId, { extracted: true }),
-    feedback: { extracted: true },
+    feedback: {
+      result: HEIST_RESULT_CODES.extraction_success,
+      message: "Extraction successful.",
+      extracted: true,
+      extractionRoomId: state.params.winCondition.extractionRoomId,
+    },
   };
 }
 
 function invalidAction(
   state: HeistState,
   agentId: AgentId,
+  error: HeistErrorCode,
   message: string,
+  details?: Record<string, unknown>,
 ): AdjudicationResult<HeistState> {
   return {
     valid: false,
     state: applyInvalidPenalty(advanceTurn(state), agentId),
-    feedback: { error: message },
+    feedback: {
+      error,
+      message,
+      ...(details ?? {}),
+    },
   };
 }
 
