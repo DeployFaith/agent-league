@@ -297,6 +297,14 @@ export async function writeTournamentArtifacts(
 export async function buildTournamentBundle(result: TournamentResult): Promise<TournamentBundleV1> {
   const summaryLookup = new Map(result.matchSummaries.map((summary) => [summary.matchKey, summary]));
   const provenance = await buildMatchManifestProvenance(result);
+  const effectiveMaxTurnTimeMs = resolveMaxTurnTimeMs({
+    seed: result.config.seed,
+    maxTurns: result.config.maxTurns,
+    modeProfile: result.config.modeProfile,
+    divisionConfig: result.config.divisionConfig,
+    maxTurnTimeMs: result.config.maxTurnTimeMs,
+    maxConsecutiveTimeouts: result.config.maxConsecutiveTimeouts,
+  });
 
   const matches = result.tournament.matches.map((spec) => {
     assertMatchLogs(spec.matchKey, result.matchLogs);

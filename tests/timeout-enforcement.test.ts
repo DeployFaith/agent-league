@@ -154,6 +154,8 @@ describe("maxTurnTimeMs enforcement", () => {
 
     const matchDir = mkdtempSync(join(tmpdir(), "timeout-match-"));
     const matchKey = "RR:random-0-vs-baseline-1:round1";
+    const lastEvent = result.events[result.events.length - 1];
+    const endedReason = lastEvent.type === "MatchEnded" ? lastEvent.reason : "unknown";
 
     await writeMatchArtifacts({
       matchId: result.matchId,
@@ -168,9 +170,7 @@ describe("maxTurnTimeMs enforcement", () => {
       timeoutsPerAgent: result.timeoutsPerAgent,
       ...(result.forfeitedBy ? { forfeitedBy: result.forfeitedBy } : {}),
       turns: result.turns,
-      reason: result.events[result.events.length - 1].type === "MatchEnded"
-        ? result.events[result.events.length - 1].reason
-        : "unknown",
+      reason: endedReason,
       matchDir,
     });
 
@@ -192,9 +192,7 @@ describe("maxTurnTimeMs enforcement", () => {
             ? "baseline-1"
             : null,
       turns: result.turns,
-      reason: result.events[result.events.length - 1].type === "MatchEnded"
-        ? result.events[result.events.length - 1].reason
-        : "unknown",
+      reason: endedReason,
     };
 
     const matchSpec: MatchSpec = {

@@ -168,7 +168,7 @@ export function createResourceRivalsScenario(
           state: newState,
           feedback: {
             error: `Invalid bid: must be integer in [0, ${remaining}]`,
-            bid,
+            bid: bid ?? null,
           },
         };
       }

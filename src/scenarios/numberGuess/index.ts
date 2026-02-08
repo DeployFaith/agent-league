@@ -92,12 +92,12 @@ export function createNumberGuessScenario(
               ...state.agentFeedback,
               [agentId]: {
                 ...state.agentFeedback[agentId],
-                lastGuess: guess,
+                lastGuess: guess ?? null,
                 feedback: "invalid" as const,
               },
             },
           },
-          feedback: { error: "Invalid guess: out of range or non-integer", guess },
+          feedback: { error: "Invalid guess: out of range or non-integer", guess: guess ?? null },
         };
       }
 
