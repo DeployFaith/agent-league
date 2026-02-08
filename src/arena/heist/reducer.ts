@@ -91,6 +91,22 @@ const extractScenarioParams = (event: MatchEvent): Record<string, unknown> | und
   return undefined;
 };
 
+const extractScenarioMeta = (
+  params: Record<string, unknown>,
+): HeistSceneState["scenarioParams"] | undefined => {
+  const winCondition = isRecord(params.winCondition) ? params.winCondition : undefined;
+  if (!winCondition) {
+    return undefined;
+  }
+  return {
+    extractionRoomId: asString(winCondition.extractionRoomId),
+    requiredObjectives: asStringArray(
+      Array.isArray(winCondition.requiredObjectives) ? winCondition.requiredObjectives : undefined,
+    ),
+    maxAlertLevel: asNumber(winCondition.maxAlertLevel),
+  };
+};
+
 const hydrateFromScenario = (
   state: HeistSceneState,
   params: Record<string, unknown> | undefined,
@@ -106,8 +122,10 @@ const hydrateFromScenario = (
   const hasItems = Object.keys(state.items).length > 0;
   const hasGuards = Object.keys(state.guards).length > 0;
 
+  const scenarioParams = state.scenarioParams ?? extractScenarioMeta(params);
+
   if (hasRooms && hasDoors && hasEntities && hasItems && hasGuards) {
-    return state;
+    return scenarioParams !== state.scenarioParams ? { ...state, scenarioParams } : state;
   }
 
   return {
@@ -119,6 +137,7 @@ const hydrateFromScenario = (
     guards: hasGuards ? state.guards : initialized.guards,
     entities: hasEntities ? state.entities : initialized.entities,
     items: hasItems ? state.items : initialized.items,
+    scenarioParams,
   };
 };
 
@@ -346,6 +365,43 @@ export const reduceHeistEvent = (
           ...agent,
           lastAdjudication: adjudication,
         }));
+
+        // Track item pickups — set heldBy and clear roomId
+        if (event.valid) {
+          const chosenAction = isRecord(event.chosenAction) ? event.chosenAction : undefined;
+          if (chosenAction?.type === "pickup") {
+            const itemId = asString(chosenAction.itemId);
+            if (itemId && nextState.items[itemId]) {
+              nextState = {
+                ...nextState,
+                items: {
+                  ...nextState.items,
+                  [itemId]: {
+                    ...nextState.items[itemId],
+                    heldBy: event.agentId,
+                    roomId: undefined,
+                  },
+                },
+              };
+            }
+          }
+
+          // Track vault opens from feedback
+          const feedback = isRecord(event.feedback) ? event.feedback : undefined;
+          if (feedback?.result === "vault_opened") {
+            const targetId =
+              asString(chosenAction?.target) ?? asString(chosenAction?.terminalId) ?? undefined;
+            // Try to find the vault entity
+            const vaultId =
+              targetId ??
+              Object.keys(nextState.entities).find((id) => nextState.entities[id].kind === "vault");
+            if (vaultId && nextState.entities[vaultId]) {
+              nextState = updateEntityState(nextState, {
+                [vaultId]: { opened: true },
+              });
+            }
+          }
+        }
       }
       break;
     }
