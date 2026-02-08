@@ -285,7 +285,7 @@ async function readTextFile(
 
 /** Build a Map of normalised relative paths to File objects from a FileList. */
 function buildFileMap(fileList: FileList): Map<string, File> {
-  const map = new Map<string, File>();
+  const map = new (Map as unknown as { new (): Map<string, File> })();
   for (const file of Array.from(fileList)) {
     const rawPath = file.webkitRelativePath || file.name;
     const normalized = rawPath.replace(/\\/g, "/");
@@ -1017,7 +1017,7 @@ function TournamentBrowser({
   const { tournament, standings, matchSummaries } = data;
 
   const summaryByKey = useMemo(() => {
-    const map = new Map<string, MatchSummaryEntry>();
+    const map = new (Map as unknown as { new (): Map<string, MatchSummaryEntry> })();
     for (const s of matchSummaries) {
       map.set(s.matchKey, s);
     }
