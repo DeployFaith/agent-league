@@ -1,6 +1,7 @@
 import type { AdjudicationResult, Scenario } from "../../contract/interfaces.js";
 import type { AgentId, JsonValue, Seed } from "../../contract/types.js";
 import { createRng, randomInt } from "../../core/rng.js";
+import { getNumberGuessBriefing } from "./briefing.js";
 
 // ---------------------------------------------------------------------------
 // State & observation types
@@ -27,9 +28,7 @@ export interface NumberGuessObservation {
   step: number;
 }
 
-export type NumberGuessAction =
-  | { guess: number }
-  | { type: "guess"; value: number };
+export type NumberGuessAction = { guess: number } | { type: "guess"; value: number };
 
 // ---------------------------------------------------------------------------
 // Defaults
@@ -162,6 +161,8 @@ export function createNumberGuessScenario(
     getDefaultAction(): NumberGuessAction {
       return { type: "guess", value: -1 };
     },
+
+    getBriefing: getNumberGuessBriefing,
 
     reveal(state: NumberGuessState): JsonValue {
       return { _private: { secretNumber: state.secretNumber } };

@@ -9,11 +9,8 @@ import type {
   HeistScenarioParams,
   HeistTerminalEntity,
 } from "../../games/heist/types.js";
-import {
-  HEIST_ERROR_CODES,
-  HEIST_RESULT_CODES,
-  type HeistErrorCode,
-} from "./feedbackCodes.js";
+import { HEIST_ERROR_CODES, HEIST_RESULT_CODES, type HeistErrorCode } from "./feedbackCodes.js";
+import { getHeistBriefing } from "./briefing.js";
 
 // ---------------------------------------------------------------------------
 // State & observation types
@@ -242,9 +239,7 @@ export function createHeistScenario(
           }
           return { itemId, type: item.type };
         })
-        .filter((entry): entry is { itemId: string; type: HeistItem["type"] } =>
-          Boolean(entry),
-        );
+        .filter((entry): entry is { itemId: string; type: HeistItem["type"] } => Boolean(entry));
 
       return {
         currentRoomId: agent.roomId,
@@ -420,9 +415,7 @@ export function createHeistScenario(
         }
         if (entity.type === "vault") {
           const requiredItems = entity.requiredItems ?? [];
-          const requirementsMet = requiredItems.every((itemId) =>
-            sharedInventory.has(itemId),
-          );
+          const requirementsMet = requiredItems.every((itemId) => sharedInventory.has(itemId));
           vaults[entity.id] = {
             roomId: entity.roomId,
             requiredItems,
@@ -432,8 +425,7 @@ export function createHeistScenario(
       }
 
       const maxAlertLevel = state.params.rules.maxAlertLevel;
-      const tension =
-        maxAlertLevel > 0 ? Math.min(1, state.alertLevel / maxAlertLevel) : 0;
+      const tension = maxAlertLevel > 0 ? Math.min(1, state.alertLevel / maxAlertLevel) : 0;
       return {
         turn: state.turn,
         alertLevel: state.alertLevel,
@@ -452,6 +444,8 @@ export function createHeistScenario(
     getDefaultAction(): HeistAction {
       return { type: "wait" };
     },
+
+    getBriefing: getHeistBriefing,
 
     reveal(state: HeistState): JsonValue {
       return {

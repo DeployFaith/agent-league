@@ -26,6 +26,44 @@ export interface Agent<TObs = JsonValue, TAct = JsonValue> {
 }
 
 // ---------------------------------------------------------------------------
+// Game Briefing
+// ---------------------------------------------------------------------------
+
+/** Describes a single legal action type for a game briefing. */
+export interface GameBriefingAction {
+  type: string;
+  description: string;
+  jsonExample: JsonValue;
+  notes?: string[];
+}
+
+/** Describes a single observation field for a game briefing. */
+export interface GameBriefingObservationField {
+  field: string;
+  description: string;
+}
+
+/**
+ * Structured, scenario-agnostic rule briefing delivered to agents at turn 1.
+ *
+ * This is a rulebook, not a walkthrough: it covers action schemas, win
+ * conditions, and observation layout. It never contains hidden state, map
+ * data, or strategy advice.
+ *
+ * Safe for public artifacts (e.g. spectator pages).
+ */
+export interface GameBriefing {
+  gameId: string;
+  name: string;
+  summary: string;
+  winCondition: string;
+  actions: GameBriefingAction[];
+  observationGuide: GameBriefingObservationField[];
+  rulesNotes?: string[];
+  version: string;
+}
+
+// ---------------------------------------------------------------------------
 // Scenario
 // ---------------------------------------------------------------------------
 
@@ -55,6 +93,8 @@ export interface Scenario<TState = unknown, TObs = JsonValue, TAct = JsonValue> 
   getDefaultAction(): TAct;
   /** Optional end-of-match reveal (e.g. hidden secrets). Included in MatchEnded.details. */
   reveal?(state: TState): JsonValue;
+  /** Optional structured rule briefing injected into the turn-1 observation as gameRules. */
+  getBriefing?(): GameBriefing;
 }
 
 // ---------------------------------------------------------------------------
