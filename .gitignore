@@ -34,7 +34,9 @@ public/replays/*-latest.jsonl
 Documents/Agentic_Design_Patterns.pdf
 
 # Generated match output
-/data/
+/data/*
+!/data/exhibitions/
+!/data/exhibitions/**
 
 # Local doc backups
 /Documents/.old/

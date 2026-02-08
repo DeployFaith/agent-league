@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { validateJsonlText } from "../src/lib/replay/validateJsonl";
+import { validateJsonlText } from "../src/lib/replay/validateJsonl.js";
 
 const args = process.argv.slice(2);
 const allowInvalid = args.includes("--allow-invalid");

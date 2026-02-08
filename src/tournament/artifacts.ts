@@ -7,6 +7,7 @@ import type { TournamentBundleV1 } from "../lib/replay/bundle.js";
 import { detectMoments } from "../lib/replay/detectMoments.js";
 import { generateHighlights } from "../lib/replay/generateHighlights.js";
 import type { JsonValue } from "../contract/types.js";
+import { verifyMatchDirectory } from "../cli/verify-match.js";
 import { buildMatchManifestProvenance } from "./provenance.js";
 import type { MatchKey, MatchManifest, TournamentManifest, TournamentResult } from "./types.js";
 import {
@@ -118,6 +119,7 @@ function buildTournamentBroadcastManifestFiles(
     files.push({ path: `matches/${matchKey}/match.jsonl`, class: "truth" });
     files.push({ path: `matches/${matchKey}/match_manifest.json`, class: "truth" });
     files.push({ path: `matches/${matchKey}/match_summary.json`, class: "telemetry" });
+    files.push({ path: `matches/${matchKey}/verification_result.json`, class: "telemetry" });
     if (hasMoments.has(matchKey)) {
       files.push({ path: `matches/${matchKey}/moments.json`, class: "telemetry" });
     }
@@ -215,6 +217,21 @@ export async function writeTournamentArtifacts(
       }
       // TODO: Add highlights.json to broadcast_manifest.json (class: "show") when available.
     }
+
+    const verificationReport = await verifyMatchDirectory(matchDir);
+    const verificationResult = {
+      status: verificationReport.status === "pass" ? "verified" : "failed",
+      checks: {
+        logHash: verificationReport.logHash?.ok ?? false,
+        manifestHash: verificationReport.manifestHash?.ok ?? false,
+      },
+      verifiedAt: new Date(summary.seed).toISOString(),
+    };
+    writeFileSync(
+      join(matchDir, "verification_result.json"),
+      ensureSingleTrailingNewline(stableStringify(verificationResult)),
+      "utf-8",
+    );
   }
 
   const truthBundleHash = sha256Hex(Buffer.from(logHashes.sort().join(""), "utf-8"));
