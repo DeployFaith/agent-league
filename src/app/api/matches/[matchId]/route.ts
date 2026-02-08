@@ -3,12 +3,14 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { NextResponse } from "next/server";
 import { isSafeMatchId } from "@/engine/matchId";
+import { findExhibitionMatchDirectory } from "@/server/exhibitionStorage";
 import { getMatchStorageRoot } from "@/server/matchStorage";
 import type {
   MatchArtifactsIndex,
   MatchDetailResponse,
   MatchStatusRecord,
   MatchSummaryRecord,
+  VerificationResult,
 } from "@/lib/matches/types";
 
 export const runtime = "nodejs";
@@ -48,6 +50,7 @@ function buildArtifactsIndex(matchDir: string): MatchArtifactsIndex {
     ["moments", "moments.json"],
     ["highlights", "highlights.json"],
     ["broadcastManifest", "broadcast_manifest.json"],
+    ["verification", "verification_result.json"],
     ["status", "match_status.json"],
   ];
 
@@ -62,15 +65,22 @@ function buildArtifactsIndex(matchDir: string): MatchArtifactsIndex {
 
 export async function GET(
   _request: Request,
-  { params }: { params: { matchId: string } },
+  { params }: { params: Promise<{ matchId: string }> },
 ): Promise<Response> {
-  const { matchId } = params;
+  const { matchId } = await params;
   if (!isSafeMatchId(matchId)) {
     return NextResponse.json({ error: "Invalid matchId" }, { status: 400 });
   }
 
-  const matchDir = join(getMatchStorageRoot(), matchId);
-  const summary = await readJsonFile<MatchSummaryRecord>(join(matchDir, "match_summary.json"));
+  let matchDir = join(getMatchStorageRoot(), matchId);
+  let summary = await readJsonFile<MatchSummaryRecord>(join(matchDir, "match_summary.json"));
+  if (!summary) {
+    const exhibitionDir = await findExhibitionMatchDirectory(matchId);
+    if (exhibitionDir) {
+      matchDir = exhibitionDir;
+      summary = await readJsonFile<MatchSummaryRecord>(join(matchDir, "match_summary.json"));
+    }
+  }
   if (!summary) {
     return NextResponse.json({ error: "Match summary not found" }, { status: 404 });
   }
@@ -79,6 +89,9 @@ export async function GET(
   const manifest = await readJsonFile<Record<string, unknown>>(
     join(matchDir, "match_manifest.json"),
   );
+  const verification = await readJsonFile<VerificationResult>(
+    join(matchDir, "verification_result.json"),
+  );
 
   const response: MatchDetailResponse = {
     matchId: summary.matchId ?? matchId,
@@ -86,6 +99,7 @@ export async function GET(
     status,
     summary,
     artifacts: buildArtifactsIndex(matchDir),
+    verification,
   };
 
   return NextResponse.json(response);

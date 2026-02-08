@@ -19,12 +19,12 @@ function writeMatchArtifacts(matchId: string): void {
     matchId,
     matchKey: matchId,
     seed: 123,
-    agentIds: ["random-0", "baseline-1"],
+    agentIds: ["noop-0", "noop-1"],
     scores: {
-      "random-0": 10,
-      "baseline-1": 5,
+      "noop-0": 10,
+      "noop-1": 5,
     },
-    winner: "random-0",
+    winner: "noop-0",
     turns: 12,
     reason: "completed",
     hashes: {
@@ -41,8 +41,28 @@ function writeMatchArtifacts(matchId: string): void {
   );
 }
 
+function hasPrivateKey(value: unknown): boolean {
+  if (!value) {
+    return false;
+  }
+  if (Array.isArray(value)) {
+    return value.some((entry) => hasPrivateKey(entry));
+  }
+  if (typeof value === "object") {
+    for (const [key, entry] of Object.entries(value)) {
+      if (key === "_private") {
+        return true;
+      }
+      if (hasPrivateKey(entry)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 beforeEach(() => {
-  tempDir = mkdtempSync(join(tmpdir(), "match-api-"));
+  tempDir = mkdtempSync(join(tmpdir(), "match-spectator-"));
   exhibitionDir = mkdtempSync(join(tmpdir(), "match-exhibitions-"));
   process.env.MATCH_STORAGE_DIR = tempDir;
   process.env.EXHIBITION_STORAGE_DIR = exhibitionDir;
@@ -59,31 +79,18 @@ afterEach(() => {
   delete process.env.EXHIBITION_STORAGE_DIR;
 });
 
-describe("GET /api/matches", () => {
-  it("returns [] when no artifacts exist", async () => {
-    const response = await listMatches();
-    expect(response.status).toBe(200);
-    const payload = (await response.json()) as unknown[];
-    expect(payload).toEqual([]);
-  });
-
-  it("returns match summaries when artifacts exist", async () => {
+describe("spectator API responses", () => {
+  it("never include _private keys", async () => {
     writeMatchArtifacts(MATCH_ID);
 
-    const response = await listMatches();
-    expect(response.status).toBe(200);
-    const payload = (await response.json()) as Array<{ matchId: string }>;
-    expect(payload).toHaveLength(1);
-    expect(payload[0].matchId).toBe(MATCH_ID);
-  });
-});
+    const listResponse = await listMatches();
+    const listPayload = (await listResponse.json()) as unknown;
+    expect(hasPrivateKey(listPayload)).toBe(false);
 
-describe("GET /api/matches/[matchId]", () => {
-  it("returns 404 when match summary is missing", async () => {
-    const response = await getMatchDetail(new Request("http://localhost"), {
+    const detailResponse = await getMatchDetail(new Request("http://localhost"), {
       params: Promise.resolve({ matchId: MATCH_ID }),
     });
-
-    expect(response.status).toBe(404);
+    const detailPayload = (await detailResponse.json()) as unknown;
+    expect(hasPrivateKey(detailPayload)).toBe(false);
   });
 });

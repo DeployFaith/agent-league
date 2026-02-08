@@ -31,7 +31,19 @@ export interface MatchArtifactsIndex {
   moments?: string;
   highlights?: string;
   broadcastManifest?: string;
+  verification?: string;
   status?: string;
+}
+
+export type VerificationStatus = "verified" | "failed" | "pending";
+
+export interface VerificationResult {
+  status: VerificationStatus;
+  checks: {
+    logHash: boolean;
+    manifestHash: boolean;
+  };
+  verifiedAt: string;
 }
 
 export interface MatchListItem {
@@ -47,4 +59,5 @@ export interface MatchDetailResponse {
   status?: MatchStatusRecord | null;
   summary: MatchSummaryRecord;
   artifacts: MatchArtifactsIndex;
+  verification?: VerificationResult | null;
 }

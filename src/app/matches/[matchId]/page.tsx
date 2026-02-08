@@ -32,9 +32,17 @@ async function fetchMatchDetail(matchId: string): Promise<MatchDetailResponse | 
 export default async function MatchDetailPage({
   params,
 }: {
-  params: { matchId: string };
+  params: Promise<{ matchId: string }>;
 }) {
-  const match = await fetchMatchDetail(params.matchId);
+  const { matchId } = await params;
+  const match = await fetchMatchDetail(matchId);
+  const verificationStatus = match?.verification?.status;
+  const verificationLabel =
+    verificationStatus === "verified"
+      ? "Verified ✅"
+      : verificationStatus === "failed"
+        ? "Verification failed ❌"
+        : "Unverified";
 
   if (!match) {
     return (
@@ -77,6 +85,10 @@ export default async function MatchDetailPage({
               <dd className="mt-1 text-xs uppercase tracking-wide text-muted-foreground">
                 {match.status?.status ?? "unknown"}
               </dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Verification</dt>
+              <dd className="mt-1">{verificationLabel}</dd>
             </div>
             <div>
               <dt className="text-muted-foreground">Reason</dt>

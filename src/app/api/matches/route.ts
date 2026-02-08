@@ -3,6 +3,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { NextResponse } from "next/server";
 import { isSafeMatchId } from "@/engine/matchId";
+import { listExhibitionMatchDirectories } from "@/server/exhibitionStorage";
 import { getMatchStorageRoot } from "@/server/matchStorage";
 import type { MatchListItem, MatchStatusRecord, MatchSummaryRecord } from "@/lib/matches/types";
 
@@ -50,7 +51,8 @@ function extractSummaryTimestamp(summary: MatchSummaryRecord): number | null {
 export async function GET(): Promise<Response> {
   const root = getMatchStorageRoot();
   if (!existsSync(root)) {
-    return NextResponse.json([] satisfies MatchListItem[]);
+    const exhibitionEntries = await loadExhibitionEntries();
+    return NextResponse.json(exhibitionEntries);
   }
 
   let entries: MatchListItem[] = [];
@@ -91,7 +93,15 @@ export async function GET(): Promise<Response> {
     entries = [];
   }
 
-  const ordered = entries
+  const exhibitionEntries = await loadExhibitionEntries();
+  const entriesById = new Map(entries.map((entry) => [entry.matchId, entry]));
+  for (const entry of exhibitionEntries) {
+    if (!entriesById.has(entry.matchId)) {
+      entriesById.set(entry.matchId, entry);
+    }
+  }
+
+  const ordered = Array.from(entriesById.values())
     .map((entry) => ({
       entry,
       timestamp: extractSummaryTimestamp(entry.summary),
@@ -114,4 +124,34 @@ export async function GET(): Promise<Response> {
     .map(({ entry }) => entry);
 
   return NextResponse.json(ordered);
+}
+
+async function loadExhibitionEntries(): Promise<MatchListItem[]> {
+  const matchDirs = await listExhibitionMatchDirectories();
+  if (matchDirs.length === 0) {
+    return [];
+  }
+
+  const results = await Promise.all(
+    matchDirs.map(async (matchDir) => {
+      const summary = await readJsonFile<MatchSummaryRecord>(
+        join(matchDir, "match_summary.json"),
+      );
+      if (!summary) {
+        return null;
+      }
+      const manifest = await readJsonFile<Record<string, unknown>>(
+        join(matchDir, "match_manifest.json"),
+      );
+      const matchId = summary.matchId;
+      return {
+        matchId,
+        scenarioName: resolveScenarioName(manifest),
+        status: null,
+        summary,
+      } satisfies MatchListItem;
+    }),
+  );
+
+  return results.filter(Boolean) as MatchListItem[];
 }
