@@ -1,5 +1,11 @@
 // Contract types
 export type {
+  GameBriefing,
+  GameBriefingAction,
+  GameBriefingObservationField,
+} from "./contract/interfaces.js";
+
+export type {
   CommentaryEntry,
   MomentBoundEntry,
   RangeBoundEntry,

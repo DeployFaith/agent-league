@@ -95,9 +95,7 @@ async function runMatchStandard<TState, TObs, TAct>(
   const timeoutsPerAgent: Record<AgentId, number> = Object.fromEntries(
     agentIds.map((agentId) => [agentId, 0]),
   );
-  const consecutiveTimeouts = new Map<AgentId, number>(
-    agentIds.map((agentId) => [agentId, 0]),
-  );
+  const consecutiveTimeouts = new Map<AgentId, number>(agentIds.map((agentId) => [agentId, 0]));
   let forfeitedBy: AgentId | undefined;
 
   // Give each agent its own independent RNG stream
@@ -143,7 +141,13 @@ async function runMatchStandard<TState, TObs, TAct>(
         break;
       }
 
-      const observation = scenario.observe(state, agent.id);
+      const rawObservation = scenario.observe(state, agent.id);
+      // Injection seam: on turn 1, attach the scenario's rule briefing as
+      // gameRules so agents receive structured rules on their first observation.
+      const briefing = turn === 1 ? scenario.getBriefing?.() : undefined;
+      const observation = briefing
+        ? ({ ...(rawObservation as object), gameRules: briefing } as TObs)
+        : rawObservation;
       emit(events, seq, matchId, {
         type: "ObservationEmitted",
         agentId: agent.id,
@@ -286,8 +290,13 @@ export async function runMatch<TState, TObs, TAct>(
   const matchId = config.matchId ?? resultA.matchId;
   const resultB = await runMatchStandard(scenario, [agentB], { ...config, matchId });
 
-  return combineHeistRuns(scenario.name, { ...config, matchId }, [agentA.id, agentB.id], [
-    { agentId: agentA.id, result: resultA },
-    { agentId: agentB.id, result: resultB },
-  ]);
+  return combineHeistRuns(
+    scenario.name,
+    { ...config, matchId },
+    [agentA.id, agentB.id],
+    [
+      { agentId: agentA.id, result: resultA },
+      { agentId: agentB.id, result: resultB },
+    ],
+  );
 }

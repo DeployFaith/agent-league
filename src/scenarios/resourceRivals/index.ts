@@ -1,6 +1,7 @@
 import type { AdjudicationResult, Scenario } from "../../contract/interfaces.js";
 import type { AgentId, JsonValue, Seed } from "../../contract/types.js";
 import { createRng, randomInt } from "../../core/rng.js";
+import { getResourceRivalsBriefing } from "./briefing.js";
 
 // ---------------------------------------------------------------------------
 // State & observation types
@@ -56,9 +57,7 @@ export interface ResourceRivalsObservation {
   };
 }
 
-export type ResourceRivalsAction =
-  | { bid: number }
-  | { type: "bid"; amount: number };
+export type ResourceRivalsAction = { bid: number } | { type: "bid"; amount: number };
 
 // ---------------------------------------------------------------------------
 // Defaults
@@ -204,6 +203,8 @@ export function createResourceRivalsScenario(
     getDefaultAction(): ResourceRivalsAction {
       return { type: "bid", amount: 0 };
     },
+
+    getBriefing: getResourceRivalsBriefing,
 
     reveal(state: ResourceRivalsState): JsonValue {
       return {
