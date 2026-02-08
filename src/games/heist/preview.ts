@@ -354,6 +354,10 @@ export function generatePreview(params: HeistScenarioParams, options: PreviewOpt
   } else {
     lines.push("  (no map data)");
   }
+  if (roomCount > 0) {
+    const roomIds = params.map.rooms.map((room) => room.id).join(", ");
+    lines.push(`ROOM IDS: ${roomIds}`);
+  }
   if (options.verbose) {
     lines.push("");
     lines.push("GUARD PATROLS:");
