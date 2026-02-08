@@ -51,3 +51,8 @@ gateway_transcript.jsonl
 
 # local keys
 /keys/
+
+# Keys: ignore private material, allow committed public keys
+/keys/*
+!/keys/.gitignore
+!/keys/*.pub.pem
