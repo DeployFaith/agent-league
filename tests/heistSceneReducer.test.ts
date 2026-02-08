@@ -16,7 +16,7 @@ describe("heist scene reducer", () => {
     const strictParsed = parseReplayJsonl(text);
     expect(strictParsed.errors).toEqual([]);
 
-    const events = parsed.events.map((event) => event.raw as MatchEvent);
+    const events = parsed.events.map((event) => event.raw as unknown as MatchEvent);
     const state = foldEvents(events);
 
     expect(Object.keys(state.map.rooms).length).toBeGreaterThan(0);
@@ -35,14 +35,14 @@ describe("heist scene reducer", () => {
   it("keeps folding when unknown events appear", () => {
     const text = readFileSync(FIXTURE_PATH, "utf-8");
     const parsed = parseJsonl(text);
-    const events = parsed.events.map((event) => event.raw as MatchEvent);
+    const events = parsed.events.map((event) => event.raw as unknown as MatchEvent);
     const matchId = events[0]?.matchId ?? "unknown";
 
     const unknownEvent = {
       type: "HeistMysteryEvent",
       seq: events[0]?.seq ?? 0.5,
       matchId,
-    } as MatchEvent;
+    } as unknown as MatchEvent;
 
     const injected = [events[0], unknownEvent, ...events.slice(1)];
     const state = foldEvents(injected);

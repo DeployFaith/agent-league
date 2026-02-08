@@ -276,19 +276,17 @@ export const reduceHeistEvent = (
         const visibleItems = Array.isArray(observation.visibleItems)
           ? observation.visibleItems
           : [];
-        const itemRooms = visibleItems
-          .map((item) => {
-            if (!isRecord(item)) {
-              return undefined;
-            }
-            const itemId = asString(item.id);
-            const roomId = asString(item.roomId);
-            if (!itemId) {
-              return undefined;
-            }
-            return { itemId, roomId };
-          })
-          .filter((entry): entry is { itemId: string; roomId?: string } => Boolean(entry));
+        const itemRooms = visibleItems.flatMap((item) => {
+          if (!isRecord(item)) {
+            return [];
+          }
+          const itemId = asString(item.id);
+          const roomId = asString(item.roomId);
+          if (!itemId) {
+            return [];
+          }
+          return [{ itemId, roomId }];
+        });
         nextState = updateItemRooms(nextState, itemRooms);
 
         const priv = isRecord(observation._private) ? observation._private : undefined;
