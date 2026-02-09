@@ -2,14 +2,8 @@ import { execSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { runMatch } from "../engine/runMatch.js";
-import { runMatchWithGateway } from "../engine/runMatchWithGateway.js";
 import { toStableJsonl } from "../core/json.js";
-import { createHttpAdapter } from "../gateway/httpAdapter.js";
-import { createTranscriptWriter } from "../gateway/transcript.js";
-import type { GatewayRuntimeConfig } from "../gateway/runtime.js";
-import { getScenarioFactory, getAgentFactory } from "../tournament/runTournament.js";
-import { writeMatchArtifacts } from "../server/matchArtifacts.js";
+import { runMatchWithArtifacts } from "../tournament/runMatchWithArtifacts.js";
 
 // ---------------------------------------------------------------------------
 // Arg parsing
@@ -175,7 +169,7 @@ export function resolveAgentDefaults(args: MatchCliArgs): {
     } else if (!args.agentAProvided && !args.agentBProvided) {
       agentA = "noop";
       agentB = "noop";
-      warning = `Warning: No default agents for scenario \"${args.scenario}\". Using noop agents.\nSpecify --agentA and --agentB for meaningful results.`;
+      warning = `Warning: No default agents for scenario "${args.scenario}". Using noop agents.\nSpecify --agentA and --agentB for meaningful results.`;
     } else {
       if (!args.agentAProvided) {
         agentA = "noop";
@@ -235,35 +229,6 @@ async function main(): Promise<void> {
     console.warn(resolvedAgents.warning);
   }
 
-  // Validate scenario (getScenarioFactory throws with available options on unknown key)
-  let scenarioFactory;
-  try {
-    scenarioFactory = getScenarioFactory(args.scenario);
-  } catch (err: unknown) {
-    // eslint-disable-next-line no-console
-    console.error(err instanceof Error ? err.message : String(err));
-    process.exit(1);
-  }
-
-  // Validate agents
-  const agentFactories = agentKeys.map((key, index) => {
-    try {
-      return { key, factory: getAgentFactory(key, { scenarioKey: args.scenario, slotIndex: index }) };
-    } catch (err: unknown) {
-      // eslint-disable-next-line no-console
-      console.error(err instanceof Error ? err.message : String(err));
-      process.exit(1);
-    }
-  });
-
-  const scenario = scenarioFactory();
-  const agents = agentFactories.map((agentConfig, index) => {
-    if (!agentConfig) {
-      throw new Error(`Missing agent factory for "${agentKeys[index]}"`);
-    }
-    return agentConfig.factory(`${agentConfig.key}-${index}`);
-  });
-
   // Opt-in provenance: only include if explicitly requested AND at least one field resolves.
   let provenance: { engineCommit?: string; engineVersion?: string } | undefined;
 
@@ -281,76 +246,39 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  if (args.gateway === "http" && args.agentUrls.length !== agents.length) {
+  if (args.gateway === "http" && args.agentUrls.length !== agentKeys.length) {
     // eslint-disable-next-line no-console
     console.error("Error: --agent-urls must have the same count as agents.");
     process.exit(1);
   }
 
-  let result;
-  const matchConfig = {
-    seed: args.seed,
-    maxTurns: args.turns,
-    ...(provenance ? { provenance } : {}),
-    ...(args.matchId ? { matchId: args.matchId } : {}),
-  };
-  if (args.gateway) {
-    const outDir = args.out ? dirname(args.out) : process.cwd();
-    const gatewayDefaults = {
-      defaultDeadlineMs: 5000,
-      maxResponseBytes: 1024 * 1024,
-    };
-    const gatewayConfig: GatewayRuntimeConfig = {
-      mode: args.gateway,
-      config: gatewayDefaults,
-      transcriptWriter: createTranscriptWriter(outDir),
-      gameId: scenario.name,
-      gameVersion: "unknown",
-      ...(args.gateway === "http"
-        ? {
-            adapters: new Map(
-              agents.map((agent, index) => [
-                agent.id,
-                createHttpAdapter(args.agentUrls[index], gatewayDefaults),
-              ]),
-            ),
-          }
-        : {}),
-    };
-
-    result = await runMatchWithGateway(scenario, agents, matchConfig, gatewayConfig);
-  } else {
-    result = await runMatch(scenario, agents, matchConfig);
-  }
-
-  const lines = toStableJsonl(result.events);
-  const lastEvent = result.events[result.events.length - 1];
-  const reason = lastEvent?.type === "MatchEnded" ? lastEvent.reason : "unknown";
-
-  if (args.outDir) {
-    await writeMatchArtifacts({
-      matchId: result.matchId,
-      scenarioName: scenario.name,
+  let outcome;
+  try {
+    outcome = await runMatchWithArtifacts({
       scenarioKey: args.scenario,
       agentKeys,
       seed: args.seed,
       maxTurns: args.turns,
-      maxTurnTimeMs: result.maxTurnTimeMs,
-      events: result.events,
-      scores: result.scores,
-      timeoutsPerAgent: result.timeoutsPerAgent,
-      ...(result.forfeitedBy ? { forfeitedBy: result.forfeitedBy } : {}),
-      turns: result.turns,
-      reason,
-      matchDir: args.outDir,
+      matchId: args.matchId,
+      outDir: args.outDir,
+      gateway: args.gateway,
+      agentUrls: args.agentUrls,
+      transcriptDir: args.out ? dirname(args.out) : undefined,
+      provenance,
     });
+  } catch (err: unknown) {
+    // eslint-disable-next-line no-console
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
   }
+
+  const lines = toStableJsonl(outcome.result.events);
 
   if (args.out) {
     mkdirSync(dirname(args.out), { recursive: true });
     writeFileSync(args.out, lines, "utf-8");
     // eslint-disable-next-line no-console
-    console.error(`Wrote ${result.events.length} events to ${args.out}`);
+    console.error(`Wrote ${outcome.result.events.length} events to ${args.out}`);
   } else if (!args.outDir) {
     process.stdout.write(lines);
   }

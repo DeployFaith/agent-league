@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync } from "node:fs";
+import { createWriteStream, existsSync, mkdirSync } from "node:fs";
+import { stat } from "node:fs/promises";
 import { join } from "node:path";
 import { NextResponse } from "next/server";
 import { verifyMatchDirectory } from "@/cli/verify-match";
@@ -107,6 +108,15 @@ function createRunnerArgs(
   ];
 }
 
+async function isNonEmptyFile(filePath: string): Promise<boolean> {
+  try {
+    const stats = await stat(filePath);
+    return stats.isFile() && stats.size > 0;
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(request: Request): Promise<Response> {
   if (process.env.HASHMATCH_OPERATOR_MODE !== "true") {
     return new Response("Not Found", { status: 404 });
@@ -159,30 +169,79 @@ export async function POST(request: Request): Promise<Response> {
   await writeMatchStatusAtomic(matchDir, runningStatus);
 
   const runnerArgs = createRunnerArgs(matchId, parsed.data, matchDir, seed, totalTurns);
-  const child = spawn(process.execPath, runnerArgs, {
-    detached: false,
-    stdio: "ignore",
-  });
+  const runnerLogPath = join(matchDir, "runner.log");
+  const runnerLog = createWriteStream(runnerLogPath, { flags: "a" });
+  let finalized = false;
 
-  const finalizeStatus = async () => {
+  const finalizeStatus = async ({
+    exitCode,
+    signal,
+    errorMessage,
+  }: {
+    exitCode: number | null;
+    signal: NodeJS.Signals | null;
+    errorMessage?: string;
+  }) => {
+    if (finalized) {
+      return;
+    }
+    finalized = true;
     const latestStatus = (await readMatchStatus(matchDir)) ?? runningStatus;
     const finishedAt = new Date().toISOString();
-    const report = await verifyMatchDirectory(matchDir);
-    const verified = report.status === "pass";
+    const matchLogPath = join(matchDir, "match.jsonl");
+    let verified = false;
+    let resolvedErrorMessage = errorMessage;
+
+    if (await isNonEmptyFile(matchLogPath)) {
+      const report = await verifyMatchDirectory(matchDir);
+      verified = report.status === "pass";
+      if (!verified && report.errors.length > 0 && !resolvedErrorMessage) {
+        resolvedErrorMessage = report.errors.join("; ");
+      }
+    } else if (!resolvedErrorMessage) {
+      const exitLabel = exitCode === null ? "unknown" : String(exitCode);
+      const signalLabel = signal ? ` signal: ${signal}` : "";
+      resolvedErrorMessage = `match.jsonl not written; runner exit code: ${exitLabel}${signalLabel}`;
+    }
+
     const finalStatus: MatchLifecycleStatusRecord = {
       ...latestStatus,
       status: "finished",
       finishedAt,
       verified,
+      exitCode,
+      signal,
+      ...(resolvedErrorMessage ? { errorMessage: resolvedErrorMessage } : {}),
     };
     await writeMatchStatusAtomic(matchDir, finalStatus);
   };
 
-  child.on("exit", (_code) => {
-    void finalizeStatus();
+  let child;
+  try {
+    child = spawn(process.execPath, runnerArgs, {
+      detached: false,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    runnerLog.write(`Spawn error: ${message}\n`);
+    runnerLog.end();
+    await finalizeStatus({ exitCode: null, signal: null, errorMessage: message });
+    return NextResponse.json({ matchId });
+  }
+
+  child.stdout?.pipe(runnerLog);
+  child.stderr?.pipe(runnerLog);
+
+  child.on("exit", (exitCode, signal) => {
+    runnerLog.end();
+    void finalizeStatus({ exitCode, signal });
   });
-  child.on("error", () => {
-    void finalizeStatus();
+  child.on("error", (err) => {
+    const message = err instanceof Error ? err.message : String(err);
+    runnerLog.write(`Runner error: ${message}\n`);
+    runnerLog.end();
+    void finalizeStatus({ exitCode: null, signal: null, errorMessage: message });
   });
 
   return NextResponse.json({ matchId });
