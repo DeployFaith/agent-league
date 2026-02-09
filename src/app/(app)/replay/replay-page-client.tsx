@@ -98,6 +98,18 @@ interface TournamentMeta {
 }
 
 /** Shape of each matches/<key>/match_summary.json. */
+interface FailureModeHitEntry {
+  id: `FM-${string}`;
+  count: number;
+  rate?: number;
+  detectorSource: "core" | `scenario:${string}`;
+}
+
+interface FailureModeProfileEntry {
+  fmClassifierVersion: string;
+  byAgentId: Record<string, FailureModeHitEntry[]>;
+}
+
 interface MatchSummaryEntry {
   matchId: string;
   matchKey: string;
@@ -109,6 +121,7 @@ interface MatchSummaryEntry {
   winner: string | null;
   turns: number;
   reason: string;
+  failureModes?: FailureModeProfileEntry;
 }
 
 /** Shape of each row in standings.json. */
