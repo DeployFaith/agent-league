@@ -1,3 +1,4 @@
+import { loadEnv } from "../lib/env/loadEnv.js";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,6 +10,8 @@ import type { HeistGeneratorConfig } from "../games/heist/generatorTypes.js";
 import { generateLayoutReport } from "../games/heist/layoutReport.js";
 import type { HeistScenarioParams } from "../games/heist/types.js";
 import { validateHeistScenario } from "../games/heist/validator.js";
+
+loadEnv();
 
 interface ScenarioFile {
   schemaVersion: "0.1.0";

@@ -1,3 +1,4 @@
+import { loadEnv } from "../lib/env/loadEnv.js";
 import { execSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -5,6 +6,8 @@ import { fileURLToPath } from "node:url";
 import { toStableJsonl } from "../core/json.js";
 import { runMatchWithArtifacts } from "../tournament/runMatchWithArtifacts.js";
 import { assertPublishableAgents } from "../tournament/publishGuard.js";
+
+loadEnv();
 
 // ---------------------------------------------------------------------------
 // Arg parsing

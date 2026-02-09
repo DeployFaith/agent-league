@@ -1,3 +1,4 @@
+import { loadEnv } from "../lib/env/loadEnv.js";
 import { execSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -7,6 +8,8 @@ import { createNumberGuessScenario } from "../scenarios/numberGuess/index.js";
 import { getScenarioAdapter } from "../agents/llm/adapters.js";
 import { createLlmAgent } from "../agents/llm/createLlmAgent.js";
 import { resolveLlmBudgetConfig } from "../agents/llm/budget.js";
+
+loadEnv();
 
 interface CliArgs {
   seed: number;
