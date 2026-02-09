@@ -8,6 +8,11 @@ import {
   type MatchReceiptPayload,
   type TournamentReceiptPayload,
 } from "../core/receipt.js";
+import {
+  sortBroadcastManifestFiles,
+  type BroadcastManifest,
+  type BroadcastManifestFileEntry,
+} from "../core/broadcastManifest.js";
 
 interface CliArgs {
   tournamentDir?: string;
@@ -106,6 +111,42 @@ function ensureTrailingNewline(value: string): string {
   return value.replace(/\n*$/, "\n");
 }
 
+async function patchBroadcastManifest(
+  tournamentDir: string,
+  matchDirNames: string[],
+): Promise<void> {
+  const manifestPath = join(tournamentDir, "broadcast_manifest.json");
+  const manifestStats = await stat(manifestPath).catch(() => null);
+  if (!manifestStats || !manifestStats.isFile()) {
+    return;
+  }
+
+  const raw = await readFile(manifestPath, "utf-8");
+  const manifest = JSON.parse(raw) as BroadcastManifest;
+
+  const existingPaths = new Set(manifest.files.map((f) => f.path));
+  const newEntries: BroadcastManifestFileEntry[] = [];
+
+  for (const matchDirName of matchDirNames) {
+    const receiptPath = `matches/${matchDirName}/receipt.json`;
+    if (!existingPaths.has(receiptPath)) {
+      newEntries.push({ path: receiptPath, class: "telemetry" });
+    }
+  }
+
+  const tournamentReceiptPath = "tournament_receipt.json";
+  if (!existingPaths.has(tournamentReceiptPath)) {
+    newEntries.push({ path: tournamentReceiptPath, class: "telemetry" });
+  }
+
+  if (newEntries.length === 0) {
+    return;
+  }
+
+  manifest.files = sortBroadcastManifestFiles([...manifest.files, ...newEntries]);
+  await writeFile(manifestPath, ensureTrailingNewline(stableStringify(manifest)), "utf-8");
+}
+
 export async function runSignTournamentCli(argv: string[]): Promise<number> {
   const args = parseArgs(argv);
   if (!args.tournamentDir) {
@@ -178,6 +219,8 @@ export async function runSignTournamentCli(argv: string[]): Promise<number> {
   const tournamentReceipt = signTournamentReceipt(tournamentPayload, privateKeyPem);
   const tournamentReceiptJson = ensureTrailingNewline(stableStringify(tournamentReceipt));
   await writeFile(join(tournamentDir, "tournament_receipt.json"), tournamentReceiptJson, "utf-8");
+
+  await patchBroadcastManifest(tournamentDir, matchDirs);
 
   // eslint-disable-next-line no-console
   console.log(`Signed ${matchDirs.length} match receipts + 1 tournament receipt.`);
