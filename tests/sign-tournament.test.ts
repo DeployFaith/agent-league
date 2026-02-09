@@ -14,6 +14,7 @@ import {
 } from "../src/core/receipt.js";
 import { hashFile } from "../src/core/hash.js";
 import type { TournamentConfig } from "../src/tournament/types.js";
+import type { BroadcastManifest } from "../src/core/broadcastManifest.js";
 
 function makeConfig(overrides: Partial<TournamentConfig> = {}): TournamentConfig {
   return {
@@ -83,6 +84,48 @@ describe("sign-tournament", () => {
       appendFileSync(matchLogPath, "tamper");
       const updatedLogHash = await hashFile(matchLogPath);
       expect(updatedLogHash).not.toBe(receipt.payload.logHash);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(keyDir, { recursive: true, force: true });
+    }
+  });
+
+  it("patches broadcast manifest to include receipt files", async () => {
+    const { dir, result } = await setupTournamentDir();
+    const keyDir = mkdtempSync(join(tmpdir(), "hashmatch-keys-"));
+    try {
+      const { privateKey } = generateKeyPair();
+      const privateKeyPath = join(keyDir, "organizer.key");
+      writeFileSync(privateKeyPath, privateKey, "utf-8");
+
+      const exitCode = await runSignTournamentCli([
+        dir,
+        "--key",
+        privateKeyPath,
+        "--issuer",
+        "unit-test",
+      ]);
+      expect(exitCode).toBe(0);
+
+      const manifest = JSON.parse(
+        readFileSync(join(dir, "broadcast_manifest.json"), "utf-8"),
+      ) as BroadcastManifest;
+      const paths = manifest.files.map((f) => f.path);
+
+      for (const summary of result.matchSummaries) {
+        const receiptPath = `matches/${summary.matchKey}/receipt.json`;
+        expect(paths).toContain(receiptPath);
+        const entry = manifest.files.find((f) => f.path === receiptPath);
+        expect(entry?.class).toBe("telemetry");
+      }
+
+      expect(paths).toContain("tournament_receipt.json");
+      const tournamentEntry = manifest.files.find((f) => f.path === "tournament_receipt.json");
+      expect(tournamentEntry?.class).toBe("telemetry");
+
+      // Verify files are sorted (localeCompare, matching sortBroadcastManifestFiles)
+      const sortedPaths = [...paths].sort((a, b) => a.localeCompare(b));
+      expect(paths).toEqual(sortedPaths);
     } finally {
       rmSync(dir, { recursive: true, force: true });
       rmSync(keyDir, { recursive: true, force: true });

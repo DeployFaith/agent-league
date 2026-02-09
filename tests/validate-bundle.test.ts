@@ -159,6 +159,22 @@ describe("validate-bundle", () => {
     }
   });
 
+  it("signed bundle has no broadcast manifest warnings", async () => {
+    const { dir, keyDir } = await setupSignedTournament();
+
+    try {
+      const report = await validateBundle(dir, { requireSignatures: true });
+      expect(report.exitCode).toBe(0);
+      expect(report.checks.broadcastManifest.status).toBe("pass");
+      expect(report.checks.broadcastManifest.warnings).toEqual([]);
+      expect(report.checks.signatures.status).toBe("pass");
+      expect(report.warnings).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(keyDir, { recursive: true, force: true });
+    }
+  });
+
   it("require-signatures fails when receipts are missing", async () => {
     const { dir, matchKey } = await createTournamentDir();
 
