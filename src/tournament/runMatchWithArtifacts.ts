@@ -1,13 +1,17 @@
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { runMatch } from "../engine/runMatch.js";
 import { runMatchWithGateway } from "../engine/runMatchWithGateway.js";
-import type { MatchResult } from "../contract/types.js";
+import type { MatchEndedEvent, MatchResult, MatchSetupFailedEvent } from "../contract/types.js";
 import { createHttpAdapter } from "../gateway/httpAdapter.js";
 import { createTranscriptWriter } from "../gateway/transcript.js";
 import type { GatewayRuntimeConfig } from "../gateway/runtime.js";
 import { writeMatchArtifacts } from "./writeMatchArtifacts.js";
 import { getAgentFactory, getScenarioFactory } from "./runTournament.js";
-import { preflightValidateLlmAgents } from "../agents/llm/preflight.js";
+import { LlmPreflightError, preflightValidateLlmAgents } from "../agents/llm/preflight.js";
 import { parseLlmAgentKey } from "../agents/llm/keys.js";
+import { createUniqueMatchId } from "../engine/matchId.js";
+import { stableStringify, toStableJsonl } from "../core/json.js";
 
 export interface RunMatchArtifactsOptions {
   scenarioKey: string;
@@ -49,7 +53,14 @@ export async function runMatchWithArtifacts(
     return [];
   });
   if (llmAgents.length > 0) {
-    await preflightValidateLlmAgents(llmAgents);
+    try {
+      await preflightValidateLlmAgents(llmAgents);
+    } catch (err: unknown) {
+      if (options.outDir) {
+        writePreflightFailureArtifacts(options.outDir, options.matchId, err);
+      }
+      throw err;
+    }
   }
   const scenarioFactory = getScenarioFactory(options.scenarioKey);
   const agentFactories = options.agentKeys.map((key, index) => ({
@@ -89,7 +100,9 @@ export async function runMatchWithArtifacts(
     const gatewayConfig: GatewayRuntimeConfig = {
       mode: options.gateway,
       config: gatewayDefaults,
-      transcriptWriter: createTranscriptWriter(options.transcriptDir ?? options.outDir ?? process.cwd()),
+      transcriptWriter: createTranscriptWriter(
+        options.transcriptDir ?? options.outDir ?? process.cwd(),
+      ),
       gameId: scenario.name,
       gameVersion: "unknown",
       ...(options.gateway === "http"
@@ -134,4 +147,56 @@ export async function runMatchWithArtifacts(
   }
 
   return { result, scenarioName: scenario.name, reason };
+}
+
+// ---------------------------------------------------------------------------
+// Preflight failure artifact writer
+// ---------------------------------------------------------------------------
+
+function writePreflightFailureArtifacts(
+  outDir: string,
+  matchIdOverride: string | undefined,
+  err: unknown,
+): void {
+  const matchId = matchIdOverride ?? createUniqueMatchId();
+  const now = new Date().toISOString();
+  const safeMessage = err instanceof Error ? err.message : String(err);
+  const safeDetails = err instanceof LlmPreflightError ? err.details : undefined;
+
+  const setupFailedEvent: MatchSetupFailedEvent = {
+    type: "MatchSetupFailed",
+    seq: 0,
+    matchId,
+    message: safeMessage,
+    ...(safeDetails ? { details: safeDetails } : {}),
+  };
+
+  const matchEndedEvent: MatchEndedEvent = {
+    type: "MatchEnded",
+    seq: 1,
+    matchId,
+    reason: "setupFailed",
+    scores: {},
+    turns: 0,
+  };
+
+  mkdirSync(outDir, { recursive: true });
+
+  writeFileSync(
+    join(outDir, "match.jsonl"),
+    toStableJsonl([setupFailedEvent, matchEndedEvent]),
+    "utf-8",
+  );
+
+  writeFileSync(
+    join(outDir, "match_status.json"),
+    stableStringify({
+      matchId,
+      status: "failed",
+      startedAt: now,
+      endedAt: now,
+      error: safeMessage,
+    }) + "\n",
+    "utf-8",
+  );
 }

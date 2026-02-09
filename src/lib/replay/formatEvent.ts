@@ -187,10 +187,7 @@ function formatActionText(a: Record<string, unknown>, scenario: string): ActionI
 // State formatting
 // ---------------------------------------------------------------------------
 
-function formatStateUpdated(
-  event: Record<string, unknown>,
-  scenario: string,
-): FormattedEvent {
+function formatStateUpdated(event: Record<string, unknown>, scenario: string): FormattedEvent {
   const summary = asObj(event.summary);
   if (!summary) {
     return { primaryText: "State updated", badge: "system" };
@@ -220,9 +217,7 @@ function formatStateUpdated(
   // Presence check: scores object in summary (common across scenarios)
   const scores = asObj(summary.scores);
   if (scores) {
-    const entries = Object.entries(scores).filter(
-      ([, v]) => typeof v === "number",
-    );
+    const entries = Object.entries(scores).filter(([, v]) => typeof v === "number");
     if (entries.length > 0) {
       const display = entries.map(([id, v]) => `${id}=${v}`).join(", ");
       return { primaryText: `Score: ${display}`, badge: "score" };
@@ -261,10 +256,7 @@ function formatStateUpdated(
 // Feedback details (for valid ActionAdjudicated)
 // ---------------------------------------------------------------------------
 
-function formatFeedbackDetails(
-  feedback: unknown,
-  scenario: string,
-): string | undefined {
+function formatFeedbackDetails(feedback: unknown, scenario: string): string | undefined {
   if (feedback === undefined || feedback === null) {
     return undefined;
   }
@@ -302,10 +294,7 @@ function formatFeedbackDetails(
 // Main formatter
 // ---------------------------------------------------------------------------
 
-export function formatEvent(
-  event: Record<string, unknown>,
-  scenarioName: string,
-): FormattedEvent {
+export function formatEvent(event: Record<string, unknown>, scenarioName: string): FormattedEvent {
   const type = getStr(event, "type");
 
   // -- InvalidAction (future event type) ------------------------------------
@@ -315,9 +304,17 @@ export function formatEvent(
     return {
       primaryText: `REJECTED: ${reason}`,
       details:
-        attempted !== undefined
-          ? `Attempted: ${safeJsonPreview(attempted, 200)}`
-          : undefined,
+        attempted !== undefined ? `Attempted: ${safeJsonPreview(attempted, 200)}` : undefined,
+      badge: "invalid",
+    };
+  }
+
+  // -- MatchSetupFailed -----------------------------------------------------
+  if (type === "MatchSetupFailed") {
+    const message = getStr(event, "message") ?? "Setup failed";
+    const agentId = getStr(event, "agentId");
+    return {
+      primaryText: `Setup failed${agentId ? ` (${agentId})` : ""}: ${message}`,
       badge: "invalid",
     };
   }
@@ -326,9 +323,7 @@ export function formatEvent(
   if (type === "MatchStarted") {
     const scenario = getStr(event, "scenarioName") ?? scenarioName;
     const agentIds = Array.isArray(event.agentIds)
-      ? (event.agentIds as unknown[])
-          .filter((x): x is string => typeof x === "string")
-          .join(" vs ")
+      ? (event.agentIds as unknown[]).filter((x): x is string => typeof x === "string").join(" vs ")
       : "";
     return {
       primaryText: `Match started: ${scenario}${agentIds ? ` (${agentIds})` : ""}`,
@@ -388,10 +383,7 @@ export function formatEvent(
       let reason = "Invalid action";
       const fb = asObj(feedback);
       if (fb) {
-        reason =
-          getStr(fb, "error") ??
-          getStr(fb, "message") ??
-          safeJsonPreview(feedback, 100);
+        reason = getStr(fb, "error") ?? getStr(fb, "message") ?? safeJsonPreview(feedback, 100);
       } else if (typeof feedback === "string") {
         reason = feedback;
       }
@@ -496,9 +488,7 @@ export function formatEvent(
   if ("scores" in event || "score" in event) {
     const scores = asObj(event.scores);
     if (scores) {
-      const entries = Object.entries(scores).filter(
-        ([, v]) => typeof v === "number",
-      );
+      const entries = Object.entries(scores).filter(([, v]) => typeof v === "number");
       if (entries.length > 0) {
         const display = entries.map(([id, v]) => `${id}=${v}`).join(", ");
         return {
@@ -524,9 +514,7 @@ export function formatEvent(
       const requested = getRequestedAction(event);
       return {
         primaryText: text,
-        details: requested
-          ? `Requested: ${safeJsonPreview(requested, 120)}`
-          : undefined,
+        details: requested ? `Requested: ${safeJsonPreview(requested, 120)}` : undefined,
         badge: isWait ? "wait" : "action",
       };
     }

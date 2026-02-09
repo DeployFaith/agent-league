@@ -159,11 +159,23 @@ export const AgentErrorSchema = z
   })
   .passthrough();
 
+export const MatchSetupFailedSchema = z
+  .object({
+    ...BaseFields,
+    type: z.literal("MatchSetupFailed"),
+    message: z.string(),
+    agentId: z.string().optional(),
+    provider: z.string().optional(),
+    model: z.string().optional(),
+    details: z.array(z.string()).optional(),
+  })
+  .passthrough();
+
 export const MatchEndedSchema = z
   .object({
     ...BaseFields,
     type: z.literal("MatchEnded"),
-    reason: z.enum(["completed", "maxTurnsReached", "error"]),
+    reason: z.enum(["completed", "maxTurnsReached", "error", "setupFailed"]),
     scores: z.record(z.string(), z.number()),
     turns: z.number().int(),
     details: JsonValueSchema.optional(),
@@ -181,6 +193,7 @@ export const MatchEventSchema = z.union([
   InvalidActionSchema,
   StateUpdatedSchema,
   AgentErrorSchema,
+  MatchSetupFailedSchema,
   MatchEndedSchema,
 ]);
 

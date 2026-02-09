@@ -135,9 +135,23 @@ export interface AgentErrorEvent extends BaseEvent {
   errorType?: string;
 }
 
+export interface MatchSetupFailedEvent extends BaseEvent {
+  type: "MatchSetupFailed";
+  /** Human-readable summary of the setup failure. */
+  message: string;
+  /** Agent scoped to the failure, if applicable. */
+  agentId?: AgentId;
+  /** Provider name, if the failure relates to an LLM provider. */
+  provider?: string;
+  /** Model name, if the failure relates to a specific model. */
+  model?: string;
+  /** Safe detail strings (no secrets, no stack traces). */
+  details?: string[];
+}
+
 export interface MatchEndedEvent extends BaseEvent {
   type: "MatchEnded";
-  reason: "completed" | "maxTurnsReached" | "agentForfeited";
+  reason: "completed" | "maxTurnsReached" | "agentForfeited" | "setupFailed";
   scores: Record<AgentId, number>;
   turns: number;
   /** Optional scenario-specific details revealed at match end (e.g. secret values). */
@@ -156,6 +170,7 @@ export type MatchEvent =
   | InvalidActionEvent
   | StateUpdatedEvent
   | AgentErrorEvent
+  | MatchSetupFailedEvent
   | MatchEndedEvent;
 
 // ---------------------------------------------------------------------------
