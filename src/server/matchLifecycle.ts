@@ -15,6 +15,9 @@ export interface MatchLifecycleStatusRecord {
   verified: boolean | null;
   totalTurns: number;
   currentTurn: number | null;
+  errorMessage?: string;
+  exitCode?: number | null;
+  signal?: NodeJS.Signals | null;
 }
 
 const DEFAULT_DATA_DIR = "./data";
