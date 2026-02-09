@@ -387,6 +387,48 @@ async function resolveTournamentRoot(
   );
 }
 
+/**
+ * Recursively walk a FileSystemDirectoryHandle and build a flat
+ * Map<relativePath, File> — the same shape that buildFileMap() produces from
+ * an `<input webkitdirectory>` FileList.
+ *
+ * This lets us side-step the File System Access API's name-validation layer
+ * which rejects (or silently skips during iteration) directory/file names
+ * that contain characters like colons — e.g. matchKeys such as
+ * `RR:llm:ollama:qwen2.5-coder:7b-0-vs-baseline-1:round1`.
+ *
+ * `File` objects returned by `FileSystemFileHandle.getFile()` are lazy blobs;
+ * their content is only read when `.text()` / `.arrayBuffer()` is called, so
+ * eagerly building the full map is cheap.
+ */
+async function dirHandleToFileMap(
+  handle: FileSystemDirectoryHandle,
+  prefix: string = "",
+): Promise<Map<string, File>> {
+  const map = new Map<string, File>();
+  try {
+    for await (const entry of handle.values()) {
+      const path = prefix ? `${prefix}/${entry.name}` : entry.name;
+      try {
+        if (entry.kind === "file") {
+          const file = await (entry as FileSystemFileHandle).getFile();
+          map.set(path, file);
+        } else if (entry.kind === "directory") {
+          const subMap = await dirHandleToFileMap(entry as FileSystemDirectoryHandle, path);
+          for (const [k, v] of subMap) {
+            map.set(k, v);
+          }
+        }
+      } catch {
+        // Skip individual entries that cannot be read (permission errors, etc.)
+      }
+    }
+  } catch {
+    // The iterator itself threw — return whatever we collected so far.
+  }
+  return map;
+}
+
 // ---------------------------------------------------------------------------
 // File-map helpers (for <input webkitdirectory> fallback)
 // ---------------------------------------------------------------------------
@@ -693,7 +735,16 @@ function FileDropZone({
     try {
       const dirHandle = await pickDirectory();
       const resolvedHandle = await resolveTournamentRoot(dirHandle);
-      const source: TournamentSource = { kind: "dirHandle", handle: resolvedHandle };
+
+      // Convert the directory handle to a flat fileMap immediately.
+      // This avoids per-entry name validation that the File System Access API
+      // performs when navigating via getDirectoryHandle() — matchKeys
+      // containing colons (e.g. "RR:llm:ollama:...") are rejected by that
+      // validation even though the underlying filesystem permits them.
+      // The fileMap code path uses suffix matching (findFileInMap) which is
+      // resilient to such naming issues.
+      const fileMap = await dirHandleToFileMap(resolvedHandle);
+      const source: TournamentSource = { kind: "fileMap", files: fileMap };
       const data = await loadTournamentFromSource(source);
       onTournamentLoad(data);
     } catch (err) {
