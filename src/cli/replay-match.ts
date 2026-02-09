@@ -1,3 +1,4 @@
+import { loadEnv } from "../lib/env/loadEnv.js";
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
@@ -11,6 +12,8 @@ import type {
   AgentErrorEvent,
   StateUpdatedEvent,
 } from "../contract/types.js";
+
+loadEnv();
 
 // ---------------------------------------------------------------------------
 // Known event types (must match MatchEvent union)

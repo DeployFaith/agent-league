@@ -1,3 +1,4 @@
+import { loadEnv } from "../lib/env/loadEnv.js";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -5,6 +6,8 @@ import {
   type VerifyMatchHashStatus,
   type VerifyMatchReport,
 } from "../core/verifyMatchDirectory.js";
+
+loadEnv();
 
 export function formatVerifyMatchReport(report: VerifyMatchReport): string {
   const lines: string[] = [];

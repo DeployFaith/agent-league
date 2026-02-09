@@ -1,9 +1,12 @@
+import { loadEnv } from "../lib/env/loadEnv.js";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { runTournament } from "../tournament/runTournament.js";
 import { writeTournamentArtifacts, writeTournamentBundle } from "../tournament/artifacts.js";
 import type { TournamentConfig, StandingsRow } from "../tournament/types.js";
 import { assertPublishableAgents } from "../tournament/publishGuard.js";
+
+loadEnv();
 
 // ---------------------------------------------------------------------------
 // Arg parsing

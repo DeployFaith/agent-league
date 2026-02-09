@@ -1,3 +1,4 @@
+import { loadEnv } from "../lib/env/loadEnv.js";
 import { access, readFile, readdir, stat } from "node:fs/promises";
 import { constants } from "node:fs";
 import { join, resolve } from "node:path";
@@ -8,6 +9,8 @@ import {
   type VerifyMatchReport,
   type VerifyMatchStatus,
 } from "../core/verifyMatchDirectory.js";
+
+loadEnv();
 
 const REQUIRED_FILES = ["tournament_manifest.json", "tournament.json"] as const;
 

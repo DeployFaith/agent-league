@@ -1,7 +1,10 @@
+import { loadEnv } from "../lib/env/loadEnv.js";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { generateKeyPairSync } from "node:crypto";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
+loadEnv();
 
 interface CliArgs {
   outDir?: string;

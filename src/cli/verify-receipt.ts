@@ -1,3 +1,4 @@
+import { loadEnv } from "../lib/env/loadEnv.js";
 import { access, readFile, readdir, stat } from "node:fs/promises";
 import { constants } from "node:fs";
 import { createPublicKey, verify } from "node:crypto";
@@ -11,6 +12,8 @@ import {
   type Receipt,
   type TournamentReceiptPayload,
 } from "../core/receipt.js";
+
+loadEnv();
 
 export type VerifyReceiptStatus = "pass" | "fail";
 

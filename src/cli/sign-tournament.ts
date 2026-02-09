@@ -1,3 +1,4 @@
+import { loadEnv } from "../lib/env/loadEnv.js";
 import { readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,6 +14,8 @@ import {
   type BroadcastManifest,
   type BroadcastManifestFileEntry,
 } from "../core/broadcastManifest.js";
+
+loadEnv();
 
 interface CliArgs {
   tournamentDir?: string;
