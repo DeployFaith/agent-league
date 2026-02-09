@@ -286,6 +286,57 @@ async function pickDirectory(): Promise<FileSystemDirectoryHandle> {
   ).showDirectoryPicker();
 }
 
+/**
+ * Get a child directory handle by name.  Falls back to iterating entries if
+ * the name contains characters the File System Access API rejects (e.g. colons
+ * from the `llm:<provider>:<model>` agent naming convention in matchKeys).
+ */
+async function getChildDirectory(
+  parent: FileSystemDirectoryHandle,
+  name: string,
+): Promise<FileSystemDirectoryHandle> {
+  try {
+    return await parent.getDirectoryHandle(name);
+  } catch (err) {
+    // Chrome throws TypeError (not DOMException) with "Name is not allowed"
+    // when the name contains characters like `:` that the API rejects even
+    // though the underlying filesystem permits them.  Fall back to iterating.
+    const msg = err instanceof Error ? err.message : "";
+    if (msg.includes("not allowed") || msg.includes("is not a valid name")) {
+      for await (const entry of parent.values()) {
+        if (entry.kind === "directory" && entry.name === name) {
+          return entry as FileSystemDirectoryHandle;
+        }
+      }
+      throw new Error(`Directory not found: ${name}`);
+    }
+    throw err;
+  }
+}
+
+/**
+ * Get a child file handle by name, with the same fallback as getChildDirectory.
+ */
+async function getChildFile(
+  parent: FileSystemDirectoryHandle,
+  name: string,
+): Promise<FileSystemFileHandle> {
+  try {
+    return await parent.getFileHandle(name);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "";
+    if (msg.includes("not allowed") || msg.includes("is not a valid name")) {
+      for await (const entry of parent.values()) {
+        if (entry.kind === "file" && entry.name === name) {
+          return entry as FileSystemFileHandle;
+        }
+      }
+      throw new Error(`File not found: ${name}`);
+    }
+    throw err;
+  }
+}
+
 /** Read a text file from a directory handle by path segments. */
 async function readTextFile(
   dirHandle: FileSystemDirectoryHandle,
@@ -293,9 +344,9 @@ async function readTextFile(
 ): Promise<string> {
   let current: FileSystemDirectoryHandle = dirHandle;
   for (let i = 0; i < path.length - 1; i++) {
-    current = await current.getDirectoryHandle(path[i]);
+    current = await getChildDirectory(current, path[i]);
   }
-  const fileHandle = await current.getFileHandle(path[path.length - 1]);
+  const fileHandle = await getChildFile(current, path[path.length - 1]);
   const file = await fileHandle.getFile();
   return file.text();
 }
