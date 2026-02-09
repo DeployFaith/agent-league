@@ -6,7 +6,7 @@ export interface HeistSoloRun {
   result: MatchResult;
 }
 
-type MatchEndedReason = "completed" | "maxTurnsReached" | "agentForfeited";
+type MatchEndedReason = "completed" | "maxTurnsReached" | "agentForfeited" | "setupFailed";
 
 type MatchEndSummary = {
   reason: MatchEndedReason;
