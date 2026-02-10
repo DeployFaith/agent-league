@@ -242,6 +242,20 @@ export function getAgentFactory(key: string, options: AgentFactoryOptions = {}):
   if (!registration) {
     throw new Error(`Unknown agent "${key}". Available: ${listAvailableAgentKeys()}`);
   }
+
+  // Baseline is a NumberGuess-only scripted agent (it emits { guess }).
+  // Prevent silently spamming invalid actions in other scenarios.
+  if (key === "baseline") {
+    if (!options.scenarioKey) {
+      throw new Error('Internal: getAgentFactory("baseline") requires scenarioKey.');
+    }
+    if (options.scenarioKey !== "numberGuess") {
+      throw new Error(
+        'Agent "baseline" is NumberGuess-only. Use "random"/"noop" or implement a scenario baseline.',
+      );
+    }
+  }
+
   return registration.factory;
 }
 
