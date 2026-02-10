@@ -1,0 +1,28 @@
+import { describe, expect, it } from "vitest";
+import { getAgentFactory } from "../src/tournament/runTournament.js";
+
+describe("baseline agent scenario guard", () => {
+  it("throws when baseline is used with a non-numberGuess scenario", () => {
+    expect(() => getAgentFactory("baseline", { scenarioKey: "heist", slotIndex: 0 })).toThrow(
+      'Agent "baseline" is NumberGuess-only',
+    );
+  });
+
+  it("allows baseline for numberGuess", () => {
+    expect(() =>
+      getAgentFactory("baseline", { scenarioKey: "numberGuess", slotIndex: 0 }),
+    ).not.toThrow();
+  });
+
+  it("throws when scenarioKey is undefined (internal misuse)", () => {
+    expect(() => getAgentFactory("baseline", { slotIndex: 0 })).toThrow("requires scenarioKey");
+  });
+
+  it("does not affect noop agent on any scenario", () => {
+    expect(() => getAgentFactory("noop", { scenarioKey: "heist", slotIndex: 0 })).not.toThrow();
+  });
+
+  it("does not affect random agent on any scenario", () => {
+    expect(() => getAgentFactory("random", { scenarioKey: "heist", slotIndex: 0 })).not.toThrow();
+  });
+});
