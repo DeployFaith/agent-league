@@ -58,3 +58,6 @@ gateway_transcript.jsonl
 
 # local generated tournament bundles
 --scenario/
+
+# local keys (do not commit)
+.keys/
