@@ -179,9 +179,63 @@ function formatInventory(inventory: HeistObservation["inventory"] | undefined): 
 
 export function formatObservation(observation: unknown): string {
   const obs = observation as Partial<HeistObservation>;
+  const privateInfo = obs._private;
+
+  const inventoryIds =
+    obs.inventory && obs.inventory.length > 0
+      ? obs.inventory.map((item) => item.itemId).join(", ")
+      : "empty";
+  const visibleItemIds =
+    obs.visibleItems && obs.visibleItems.length > 0
+      ? obs.visibleItems.map((item) => item.id).join(", ")
+      : "none";
+  const visibleTerminals =
+    obs.visibleEntities
+      ?.filter((entity) => entity.type === "terminal")
+      .map((terminal) => {
+        const hacked = privateInfo?.terminalHacked?.[terminal.id];
+        const progress = privateInfo?.terminalProgress?.[terminal.id];
+        if (hacked === true) {
+          return `${terminal.id} (hacked)`;
+        }
+        if (typeof progress === "number") {
+          return `${terminal.id} (hacking: ${progress}/${terminal.hackTurns})`;
+        }
+        return `${terminal.id} (locked)`;
+      })
+      .join(", ") ?? "";
+  const adjacentRoomFacts =
+    obs.adjacentRooms
+      ?.map((room) => {
+        if (room.passable) {
+          return `${room.roomId} (unlocked)`;
+        }
+        if (room.requiredItem) {
+          return `${room.roomId} (locked: requires ${room.requiredItem})`;
+        }
+        return `${room.roomId} (locked)`;
+      })
+      .join(", ") ?? "";
+
+  const structuredLines: string[] = [];
+  const turn = typeof obs.turn === "number" ? obs.turn : 0;
+  structuredLines.push("=== SITUATION ===");
+  structuredLines.push(`Turn: ${turn}`);
+  structuredLines.push(`Room: ${obs.currentRoomId ?? "unknown"}`);
+  structuredLines.push(`Inventory: ${inventoryIds}`);
+  structuredLines.push(`Visible items: ${visibleItemIds}`);
+  structuredLines.push(`Visible terminals: ${visibleTerminals.length > 0 ? visibleTerminals : "none"}`);
+  structuredLines.push(
+    `Adjacent rooms: ${adjacentRoomFacts.length > 0 ? adjacentRoomFacts : "none"}`,
+  );
+  structuredLines.push(`Extraction room: ${privateInfo?.extractionRoomId ?? "unknown"}`);
+  if (typeof privateInfo?.alertLevel === "number") {
+    structuredLines.push(`Alert level: ${privateInfo.alertLevel}`);
+  }
+  structuredLines.push("=== END SITUATION ===");
+
   const lines: string[] = [];
 
-  const turn = typeof obs.turn === "number" ? obs.turn : 0;
   lines.push(`Turn ${turn}.`);
 
   lines.push(`Current room: ${obs.currentRoomId ?? "unknown"}.`);
@@ -190,7 +244,6 @@ export function formatObservation(observation: unknown): string {
   lines.push(`Visible entities: ${formatEntities(obs.visibleEntities)}.`);
   lines.push(`Inventory: ${formatInventory(obs.inventory)}.`);
 
-  const privateInfo = obs._private;
   if (privateInfo && typeof privateInfo === "object") {
     const alertLevel =
       typeof privateInfo.alertLevel === "number" ? privateInfo.alertLevel : undefined;
@@ -218,7 +271,7 @@ export function formatObservation(observation: unknown): string {
     }
   }
 
-  return lines.join("\n");
+  return `${structuredLines.join("\n")}\n${lines.join("\n")}`;
 }
 
 function resolveFallbackAction(observation?: unknown): HeistAction {
